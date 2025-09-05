@@ -1,0 +1,57 @@
+# Dependências
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.production
+.env.current
+.env.deploy
+
+# Logs
+logs/
+*.log
+
+# Cache de runtime
+.cache/
+.npm/
+.yarn/
+
+# Build outputs
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
+
+# Uploads
+uploads/
+
+# Prisma - manter apenas migration_lock.toml
+prisma/migrations/*
+!prisma/migrations/migration_lock.toml
+
+# Arquivos de teste
+test-*.js
+test-*.html
+nul
+
+# Docker
+.docker/
+
+# Backup files
+*.backup
+*.bak

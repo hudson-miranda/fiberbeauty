@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  username      String         @unique
+  password      String
+  role          Role           @default(ATTENDANT)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  attendances   Attendance[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Client {
+  id          String       @id @default(cuid())
+  firstName   String
+  lastName    String
+  cpf         String       @unique
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attendances Attendance[]
+  npsRatings  NPSRating[]
+
+  @@map("clients")
+}
+
+model AttendanceForm {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attendances Attendance[]
+  fields      FormField[]
+
+  @@map("attendance_forms")
+}
+
+model FormField {
+  id               String         @id @default(cuid())
+  label            String
+  type             FieldType
+  placeholder      String?
+  required         Boolean        @default(false)
+  options          Json?
+  validation       Json?
+  order            Int            @default(0)
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  attendanceFormId String
+  attendanceForm   AttendanceForm @relation(fields: [attendanceFormId], references: [id], onDelete: Cascade)
+
+  @@map("form_fields")
+}
+
+model Attendance {
+  id               String            @id @default(cuid())
+  attendanceDate   DateTime          @default(now())
+  status           AttendanceStatus  @default(IN_PROGRESS)
+  responses        Json
+  signature        String?
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  clientId         String
+  userId           String
+  attendanceFormId String
+  attendanceForm   AttendanceForm    @relation(fields: [attendanceFormId], references: [id])
+  client           Client            @relation(fields: [clientId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+  npsRating        NPSRating?
+
+  @@map("attendances")
+}
+
+model NPSRating {
+  id           String     @id @default(cuid())
+  score        Int        // Nota de 0 a 10
+  comment      String?    // Comentário opcional
+  category     NPSCategory // DETRACTOR, NEUTRAL, PROMOTER
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  attendanceId String     @unique
+  clientId     String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  client       Client     @relation(fields: [clientId], references: [id])
+
+  @@map("nps_ratings")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum Role {
+  ADMIN
+  ATTENDANT
+}
+
+enum AttendanceStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  SELECT
+  CHECKBOX
+  RADIO
+  NUMBER
+  DATE
+  TIME
+  EMAIL
+  PHONE
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+}
+
+enum NPSCategory {
+  DETRACTOR  // 0-6
+  NEUTRAL    // 7-8
+  PROMOTER   // 9-10
+}

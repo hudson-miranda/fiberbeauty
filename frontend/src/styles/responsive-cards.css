@@ -1,0 +1,106 @@
+/* Estilos para grid responsivo de cards */
+.client-card {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.client-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.client-card-header {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+.client-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.client-card-actions {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* Grid responsivo personalizado */
+.responsive-clients-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Mobile */
+@media (max-width: 639px) {
+  .responsive-clients-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .client-card {
+    min-height: 250px;
+  }
+  
+  .client-card-content {
+    padding: 0.75rem;
+  }
+}
+
+/* Tablet */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .responsive-clients-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.25rem;
+  }
+  
+  .client-card {
+    min-height: 280px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .responsive-clients-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .client-card {
+    min-height: 300px;
+  }
+  
+  .client-card-content {
+    padding: 1.25rem;
+  }
+}
+
+/* Desktop Large */
+@media (min-width: 1280px) {
+  .responsive-clients-grid {
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 2rem;
+  }
+  
+  .client-card {
+    min-height: 320px;
+  }
+  
+  .client-card-content {
+    padding: 1.5rem;
+  }
+}
+
+/* Desktop XL */
+@media (min-width: 1536px) {
+  .responsive-clients-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+}

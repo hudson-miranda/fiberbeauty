@@ -1,0 +1,64 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: beauty_salon_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: beauty_salon
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - beauty_salon_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: beauty_salon_backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/beauty_salon
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      PORT: 3001
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - beauty_salon_network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: beauty_salon_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:3001/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - beauty_salon_network
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  beauty_salon_network:
+    driver: bridge
