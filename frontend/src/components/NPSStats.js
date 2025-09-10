@@ -96,11 +96,14 @@ const NPSStats = ({ clientId = null, clientData = null, showClientFilter = true 
   if (loading) {
     return (
       <Card className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Carregando estatísticas NPS...</p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-24 bg-shimmer bg-[length:200%_100%] rounded-lg animate-[shimmer_1.5s_infinite]"
+            />
+          ))}
+          <div className="col-span-full h-64 bg-shimmer bg-[length:200%_100%] rounded-lg animate-[shimmer_1.5s_infinite]" />
         </div>
       </Card>
     );

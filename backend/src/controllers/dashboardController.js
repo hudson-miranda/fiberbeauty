@@ -27,7 +27,7 @@ const dashboardController = {
 
       // Atividades recentes (limitadas)
       const recentAttendances = await prisma.attendance.findMany({
-        take: 3,
+        take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
           client: {
@@ -40,14 +40,22 @@ const dashboardController = {
       });
 
       // Formatar atividades
-      const activities = recentAttendances.map(attendance => ({
-        id: `attendance-${attendance.id}`,
-        type: 'attendance_created',
-        description: 'Atendimento realizado para:',
-        target: `${attendance.client?.firstName} ${attendance.client?.lastName}`,
-        date: new Date(attendance.createdAt).toLocaleDateString('pt-BR'),
-        datetime: attendance.createdAt
-      }));
+      const activities = recentAttendances.map(attendance => {
+        const clientName = attendance.client 
+          ? `${attendance.client.firstName || ''} ${attendance.client.lastName || ''}`.trim()
+          : 'Cliente não informado';
+        
+        return {
+          id: `attendance-${attendance.id}`,
+          type: 'attendance_created',
+          description: 'Atendimento realizado para:',
+          target: clientName || 'Cliente não informado',
+          clientName: clientName || 'Cliente não informado',
+          date: new Date(attendance.createdAt).toLocaleDateString('pt-BR'),
+          datetime: attendance.createdAt,
+          createdAt: attendance.createdAt
+        };
+      });
 
       // Calcular mudanças baseadas em dados reais
       const yesterday = new Date();
@@ -232,32 +240,96 @@ const dashboardController = {
     }
   },
 
-  // Ranking de clientes (versão simplificada)
+  // Ranking de clientes (versão com filtros e ordenação correta)
   async getClientRanking(req, res) {
     try {
       const prisma = getPrismaClient();
+      const { startDate, endDate, period } = req.query;
 
-      // Buscar apenas os 5 clientes mais recentes
+      // Construir filtros de data para os atendimentos
+      let dateFilter = {};
+      
+      if (startDate && endDate) {
+        dateFilter = {
+          createdAt: {
+            gte: new Date(startDate),
+            lte: new Date(endDate)
+          }
+        };
+      } else if (period) {
+        const now = new Date();
+        let startOfPeriod;
+        
+        switch (period) {
+          case 'today':
+            startOfPeriod = new Date(now.setHours(0, 0, 0, 0));
+            break;
+          case 'week':
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+            startOfPeriod = startOfWeek;
+            break;
+          case 'month':
+            startOfPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'year':
+            startOfPeriod = new Date(now.getFullYear(), 0, 1);
+            break;
+          default:
+            // Sem filtro de período
+            break;
+        }
+        
+        if (startOfPeriod) {
+          dateFilter = {
+            createdAt: {
+              gte: startOfPeriod
+            }
+          };
+        }
+      }
+
+      // Buscar clientes com contagem de atendimentos filtrados
       const clients = await prisma.client.findMany({
-        take: 5,
         where: { isActive: true },
-        orderBy: { createdAt: 'desc' },
         select: {
           id: true,
           firstName: true,
           lastName: true,
+          cpf: true,
           _count: {
-            select: { attendances: true }
+            select: { 
+              attendances: {
+                where: dateFilter
+              }
+            }
           }
         }
       });
 
-      const ranking = clients.map((client, index) => ({
+      // Filtrar apenas clientes que têm atendimentos no período
+      // e ordenar por número de atendimentos (decrescente)
+      const clientsWithAttendances = clients
+        .filter(client => client._count.attendances > 0)
+        .sort((a, b) => b._count.attendances - a._count.attendances)
+        .slice(0, 5); // Top 5
+
+      const ranking = clientsWithAttendances.map((client, index) => ({
         id: client.id,
         name: `${client.firstName} ${client.lastName}`,
+        cpf: client.cpf,
         attendances: client._count.attendances,
         position: index + 1
       }));
+
+      console.log('Dashboard - Client Ranking Backend:', {
+        filtros: { startDate, endDate, period },
+        dateFilter,
+        totalClients: clients.length,
+        clientsWithAttendances: clientsWithAttendances.length,
+        ranking
+      });
 
       res.json(ranking);
 

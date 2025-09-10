@@ -142,10 +142,10 @@ const StatCard = ({ title, value, icon: Icon, change, trend, color, description,
   const handleHoverStart = () => {
     setIsHovered(true);
     setScale(1.03);
-    // Dispara apenas ao entrar no hover
+    // Dispara apenas ao entrar no hover - usando tween para múltiplos keyframes
     badgeControls.start({
       scale: [1, 1.08, 1],
-      transition: { type: 'spring', stiffness: 500, damping: 20 }
+      transition: { type: 'tween', duration: 0.3, ease: 'easeInOut' }
     });
   };
 
@@ -451,27 +451,72 @@ const InsightCard = ({ title, value, description, trend, icon: Icon, color, acti
 };
 
 // Componente PerformanceMetrics aprimorado com gráficos interativos
-const PerformanceMetrics = ({ data, loading = false }) => {
+const PerformanceMetrics = ({ data, loading = false, retryCount = 0, onRetry }) => {
   const [ref, controls] = useScrollAnimation();
   const [activeChart, setActiveChart] = useState('area');
   const [hoveredData, setHoveredData] = useState(null);
+  const [hasWaitedForData, setHasWaitedForData] = useState(false);
 
-  // Cores atualizadas para a identidade visual
-  const COLORS = ['#e5a823', '#d4af37', '#c6a769', '#b38b2e', '#e9cba5'];
+  // Debug: Log dos dados recebidos
+  useEffect(() => {
+    console.log('PerformanceMetrics - Data received:', data);
+    console.log('PerformanceMetrics - Loading:', loading);
+    console.log('PerformanceMetrics - RetryCount:', retryCount);
+    if (data) {
+      console.log('PerformanceMetrics - data.monthly:', data.monthly);
+      console.log('PerformanceMetrics - data.services:', data.services);
+    }
+  }, [data, loading, retryCount]);
+
+  // Aguardar um tempo antes de considerar dados como não disponíveis
+  useEffect(() => {
+    if (!loading) {
+      const waitTimer = setTimeout(() => {
+        console.log('PerformanceMetrics - Tempo de espera concluído');
+        setHasWaitedForData(true);
+      }, 2000); // Aguarda 2 segundos após loading false
+
+      return () => clearTimeout(waitTimer);
+    } else {
+      setHasWaitedForData(false);
+    }
+  }, [loading]);
+
+  // Cores atualizadas para melhor distinção visual
+  const COLORS = [
+    '#e5a823', // Dourado principal (mantido)
+    '#8B5CF6', // Roxo vibrante
+    '#06B6D4', // Azul ciano
+    '#10B981', // Verde esmeralda
+    '#F59E0B', // Laranja âmbar
+    '#EF4444', // Vermelho
+    '#6366F1', // Índigo
+    '#EC4899'  // Rosa
+  ];
   const CHART_COLORS = {
     primary: '#e5a823',
-    secondary: '#d4af37',
-    accent: '#c6a769'
+    secondary: '#8B5CF6',
+    accent: '#06B6D4'
   };
 
+  // Verificar se os dados estão válidos
+  const hasValidData = data && typeof data === 'object';
+  const hasMonthlyData = hasValidData && Array.isArray(data.monthly) && data.monthly.length > 0;
+  const hasServicesData = hasValidData && Array.isArray(data.services) && data.services.length > 0;
+
   // Dados mockados aprimorados para Distribuição de Serviços
-  const servicesData = data.services && data.services.length > 0 ? data.services : [
-    { name: 'Manicure/Pedicure', value: 35, color: COLORS[0] },
-    { name: 'Esmaltação', value: 25, color: COLORS[1] },
-    { name: 'Alongamento', value: 20, color: COLORS[2] },
-    { name: 'Nail Art', value: 15, color: COLORS[3] },
-    { name: 'Outros', value: 5, color: COLORS[4] }
-  ];
+  const servicesData = hasServicesData 
+    ? data.services.map((service, index) => ({
+        ...service,
+        color: service.color || COLORS[index % COLORS.length] // Garantir que sempre tem cor
+      }))
+    : [
+        { name: 'Manicure/Pedicure', value: 35, color: COLORS[0] }, // Dourado
+        { name: 'Esmaltação', value: 25, color: COLORS[1] }, // Roxo
+        { name: 'Alongamento', value: 20, color: COLORS[2] }, // Azul ciano
+        { name: 'Nail Art', value: 15, color: COLORS[3] }, // Verde
+        { name: 'Outros', value: 5, color: COLORS[4] } // Laranja
+      ];
 
   // Tooltip customizado para os gráficos
   const CustomTooltip = ({ active, payload, label }) => {
@@ -577,6 +622,83 @@ const PerformanceMetrics = ({ data, loading = false }) => {
     );
   }
 
+  if (!hasValidData) {
+    console.warn('PerformanceMetrics - Dados inválidos ou ausentes');
+    return (
+      <Card className="p-6">
+        <div className="text-center py-12">
+          <div className="text-gray-500 mb-4">
+            <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <div className="text-lg font-semibold text-gray-700 mb-2">Analytics de Atendimentos</div>
+            <div className="text-sm text-gray-500">Nenhum dado disponível para análise</div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!hasMonthlyData && !hasServicesData && hasWaitedForData) {
+    console.warn('PerformanceMetrics - Dados de gráficos ausentes após aguardar');
+    return (
+      <Card className="p-6">
+        <div className="text-center py-12">
+          <div className="text-gray-500 mb-4">
+            <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <div className="text-lg font-semibold text-gray-700 mb-2">Analytics de Atendimentos</div>
+            <div className="text-sm text-gray-500 mb-4">
+              {loading ? 'Carregando dados analíticos...' : 
+               retryCount > 0 ? `Tentativa ${retryCount}/3 de carregamento...` :
+               'Dados não disponíveis no momento'}
+            </div>
+            {!loading && retryCount < 3 && (
+              <button
+                onClick={onRetry}
+                className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            )}
+            {retryCount >= 3 && (
+              <div className="text-xs text-red-500 mt-2">
+                Não foi possível carregar os dados após 3 tentativas
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Se ainda não aguardou tempo suficiente, mostrar loading
+  if (!hasWaitedForData || loading) {
+    return (
+      <Card className="p-6">
+        <div className="space-y-6">
+          <ShimmerSkeleton className="h-8 w-64" />
+          
+          {/* Chart tabs skeleton */}
+          <div className="flex gap-2">
+            <ShimmerSkeleton className="h-8 w-20" />
+            <ShimmerSkeleton className="h-8 w-20" />
+          </div>
+          
+          {/* Main chart skeleton */}
+          <ShimmerSkeleton className="h-80" />
+          
+          {/* Secondary chart skeleton */}
+          <div className="mt-8">
+            <ShimmerSkeleton className="h-6 w-48 mb-4" />
+            <ShimmerSkeleton className="h-64" />
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <motion.div
       ref={ref}
@@ -639,7 +761,7 @@ const PerformanceMetrics = ({ data, loading = false }) => {
             className="mb-8"
           >
             <div className="h-[clamp(200px,40vw,400px)]">
-              {data.monthly && data.monthly.length > 0 ? (
+              {hasMonthlyData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {activeChart === 'area' ? (
                     <AreaChart data={data.monthly}>
@@ -1031,14 +1153,14 @@ const TopClientsRanking = ({ clients = [] }) => {
     const colors = [
       'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-yellow-500/25', // Ouro
       'bg-gradient-to-r from-gray-300 to-gray-500 text-white shadow-gray-400/25', // Prata
-      'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-orange-500/25', // Bronze
-      'bg-gradient-to-r from-primary-400 to-primary-500 text-white shadow-primary-400/25'
+      'bg-gradient-to-r from-orange-300 to-orange-500 text-white shadow-orange-500/25', // Bronze
+      'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-500 shadow-gray-300/25'
     ];
     return colors[Math.min(index, 3)];
   };
 
   const getRankingIcon = (index) => {
-    const icons = ['🥇', '🥈', '�'];
+    const icons = ['🥇', '🥈', '🥉'];
     return icons[index] || (
       <span className="text-sm font-bold">#{index + 1}</span>
     );
@@ -1056,6 +1178,19 @@ const TopClientsRanking = ({ clients = [] }) => {
     if (diffDays < 7) return `${diffDays} dias atrás`;
     if (diffDays < 30) return `${Math.ceil(diffDays / 7)} semana(s) atrás`;
     return `${Math.ceil(diffDays / 30)} mês(es) atrás`;
+  };
+
+  const formatCPF = (cpf) => {
+    if (!cpf) return '-';
+    
+    // Remove tudo que não é número
+    const numbers = cpf.replace(/\D/g, '');
+    
+    // Se não tem 11 dígitos, retorna como está
+    if (numbers.length !== 11) return cpf || '-';
+    
+    // Formata como XXX.XXX.XXX-XX
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
   // Empty state elegante
@@ -1098,32 +1233,38 @@ const TopClientsRanking = ({ clients = [] }) => {
     >
       <Card className="p-6 bg-gradient-to-br from-white to-gray-50/30 border-0 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-6 gap-2">
+          <div className="flex items-center gap-3 flex-shrink min-w-0">
             <div className="p-2 bg-gold-100 rounded-xl">
               <Crown className="w-6 h-6 text-gold-600" />
             </div>
-            <div>
-              <h3 className="text-[clamp(1rem,2.5vw,1.25rem)] font-bold text-gray-900">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-[clamp(1rem,2.5vw,1.25rem)] font-bold text-gray-900 truncate">
                 Top 5 Clientes
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm truncate">
                 Ranking por número de atendimentos
               </p>
             </div>
           </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+
+          <motion.div
+            className="flex-shrink-0"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <a
               href="#"
               role="button"
               onClick={() => navigate('/clients')}
-              className={`inline-flex items-center justify-center gap-2 rounded-lg bg-white/20 text-primary-600 border border-primary-200 hover:bg-primary-50 hover:text-primary-300 hover:border-primary-300 transition-all duration-200 px-3 py-2`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/20 text-primary-600 border border-primary-200 hover:bg-primary-50 hover:text-primary-300 hover:border-primary-300 transition-all duration-200 px-3 py-2"
             >
-              <EyeIcon className={`h-4 w-4`} />
-              <span className="hidden sm:inline">Ver Todos</span>
+              <EyeIcon className="h-4 w-4" />
+              <span className="hidden sm:inline truncate">Ver Todos</span>
             </a>
           </motion.div>
         </div>
+
 
         {/* Lista de clientes */}
         <div className="space-y-4">
@@ -1168,18 +1309,14 @@ const TopClientsRanking = ({ clients = [] }) => {
                         </h4>
                         <div className="flex items-center gap-2 text-primary-600">
                           <Users2 className="w-4 h-4" />
-                          <span className="font-bold text-lg">
-                            {client.attendanceCount || client._count?.attendances || 0}
+                          <span className="font-bold text-sm">
+                            {client.attendances || 0}
                           </span>
                         </div>
                       </div>
                       
                       <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{client.attendanceCount || client._count?.attendances || 0} atendimentos</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatLastVisit(client.lastVisit)}
-                        </span>
+                        <span>CPF: {formatCPF(client.cpf)}</span>
                       </div>
                     </div>
                     
@@ -1193,8 +1330,8 @@ const TopClientsRanking = ({ clients = [] }) => {
                     </motion.div>
                   </div>
                   
-                  {/* Efeito de brilho no hover */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none" />
+                  {/* Efeito de brilho no hover - corrigido para não sobrepor texto */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-100/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none -z-10" />
                 </motion.div>
               ))}
             </motion.div>
@@ -1214,15 +1351,15 @@ const TopClientsRanking = ({ clients = [] }) => {
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-primary-600">
-                  {clients.reduce((acc, client) => acc + (client.attendanceCount || client._count?.attendances || 0), 0)}
+                  {clients.reduce((acc, client) => acc + (client.attendances || 0), 0)}
                 </p>
-                <p className="text-sm text-gray-600">Total de Atendimentos</p>
+                <p className="text-sm text-gray-600 truncate">Atendimentos no Período</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-gold-600">
+                <p className="text-2xl font-bold text-primary-600">
                   {clients.length}
                 </p>
-                <p className="text-sm text-gray-600">Clientes Ativos</p>
+                <p className="text-sm text-gray-600 truncate">Top Clientes</p>
               </div>
             </div>
           </motion.div>
@@ -1237,19 +1374,38 @@ const RecentActivity = ({ activities = [] }) => {
   const navigate = useNavigate();
   const [ref, controls] = useScrollAnimation();
 
-  const getActivityIcon = (activity) => {
+  const getActivityIcon = (activity, index) => {
+    // Cores especiais para as primeiras atividades (mais recentes)
+    const priorityColors = [
+      'bg-gradient-to-r from-primary-400 to-primary-600 text-white shadow-primary-500/25', // 1ª mais recente
+      'bg-gradient-to-r from-purple-400 to-purple-600 text-white shadow-purple-500/25', // 2ª mais recente
+      'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-blue-500/25', // 3ª mais recente
+      'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-emerald-500/25', // 4ª mais recente
+      'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-orange-500/25' // 5ª mais recente
+    ];
+    
     const iconMap = {
-      'client_created': { icon: UserPlus, color: 'text-green-600 bg-green-100' },
-      'client_updated': { icon: User, color: 'text-blue-600 bg-blue-100' },
-      'attendance_created': { icon: Calendar, color: 'text-primary-600 bg-primary-100' },
-      'attendance_updated': { icon: Edit, color: 'text-purple-600 bg-purple-100' },
-      'attendance_completed': { icon: CheckCircle, color: 'text-emerald-600 bg-emerald-100' },
-      'payment_received': { icon: DollarSign, color: 'text-gold-600 bg-gold-100' },
-      'service_added': { icon: Plus, color: 'text-cyan-600 bg-cyan-100' },
-      'default': { icon: Activity, color: 'text-gray-600 bg-gray-100' }
+      'client_created': UserPlus,
+      'client_updated': User,
+      'attendance_created': Calendar,
+      'attendance_updated': Edit,
+      'attendance_completed': CheckCircle,
+      'payment_received': DollarSign,
+      'service_added': Plus,
+      'default': Activity
     };
     
-    return iconMap[activity.type] || iconMap.default;
+    return {
+      icon: iconMap[activity.type] || iconMap.default,
+      color: priorityColors[index] || priorityColors[4] // Se passar de 5, usa a última cor
+    };
+  };
+
+  const getActivityPriorityIcon = (index) => {
+    const icons = ['🔥', '⭐', '💎', '✨', '🎯'];
+    return icons[index] || (
+      <span className="text-sm font-bold">#{index + 1}</span>
+    );
   };
 
   const getActivityDescription = (activity) => {
@@ -1278,11 +1434,11 @@ const RecentActivity = ({ activities = [] }) => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffMinutes < 60) {
-      return `${diffMinutes === 1 ? 'há 1 minuto' : `há ${diffMinutes} minutos`}`;
+      return `${diffMinutes === 1 ? 'há 1 minuto' : `há ${diffMinutes}m`}`;
     } else if (diffHours < 24) {
-      return `${diffHours === 1 ? 'há 1 hora' : `há ${diffHours} horas`}`;
+      return `${diffHours === 1 ? 'há 1 hora' : `há ${diffHours}h`}`;
     } else {
-      return `${diffDays === 1 ? 'ontem' : `há ${diffDays} dias`}`;
+      return `${diffDays === 1 ? 'ontem' : `há ${diffDays}d`}`;
     }
   };
 
@@ -1341,8 +1497,8 @@ const RecentActivity = ({ activities = [] }) => {
           </div>
         </div>
 
-        {/* Timeline de atividades */}
-        <div className="space-y-6">
+        {/* Lista de atividades */}
+        <div className="space-y-4">
           {activities.length > 0 ? (
             <motion.div 
               variants={staggerContainer}
@@ -1350,105 +1506,66 @@ const RecentActivity = ({ activities = [] }) => {
               animate="animate"
               className="space-y-4"
             >
-              {activities.slice(0, 6).map((activity, index) => {
-                const { icon: IconComponent, color } = getActivityIcon(activity);
-                const isLast = index === Math.min(activities.length, 6) - 1;
+              {activities.slice(0, 5).map((activity, index) => {
+                const { icon: IconComponent, color } = getActivityIcon(activity, index);
+                
+                // Debug log para cada atividade
+                console.log(`Activity ${index}:`, {
+                  id: activity.id,
+                  type: activity.type,
+                  target: activity.target,
+                  clientName: activity.clientName,
+                  description: activity.description,
+                  allFields: Object.keys(activity)
+                });
                 
                 return (
                   <motion.div
                     key={activity.id || index}
                     variants={fadeInUp}
+                    whileHover={{ 
+                      scale: 1.02,
+                      transition: { type: 'spring', stiffness: 300 }
+                    }}
                     className="group relative"
                   >
-                    {/* Timeline line */}
-                    {!isLast && (
-                      <motion.div 
-                        className="absolute left-6 top-12 w-0.5 h-12 bg-gradient-to-b from-gray-300 to-transparent"
-                        initial={{ scaleY: 0 }}
-                        animate={{ scaleY: 1 }}
-                        transition={{ delay: index * 0.1, duration: 0.3 }}
-                      />
-                    )}
-                    
-                    {/* Activity item */}
-                    <motion.div
-                      className="flex items-start gap-4 p-4 bg-white/70 backdrop-blur-sm rounded-2xl border border-gray-200/50 hover:border-primary-200 hover:shadow-lg transition-all duration-300"
-                      whileHover={{ 
-                        scale: 1.02,
-                        transition: { type: 'spring', stiffness: 300 }
-                      }}
+                    <div
+                      className="flex items-center gap-4 p-4 bg-white/70 backdrop-blur-sm rounded-2xl border border-gray-200/50 hover:border-primary-200 hover:shadow-lg transition-all duration-300 cursor-pointer"
                     >
                       {/* Activity icon */}
                       <motion.div 
-                        className={`relative flex items-center justify-center w-12 h-12 rounded-2xl ${color} shadow-lg`}
+                        className={`flex items-center justify-center w-12 h-12 rounded-2xl ${color} shadow-lg relative`}
                         whileHover={{ 
                           rotate: [0, -5, 5, 0],
                           scale: 1.1
                         }}
                         transition={{ duration: 0.3 }}
                       >
-                        <IconComponent className="w-6 h-6" />
-                        
-                        {/* Pulse effect for recent activities (less than 1 hour) */}
-                        {activity.createdAt && new Date() - new Date(activity.createdAt) < 3600000 && (
-                          <motion.div
-                            className="absolute inset-0 rounded-2xl bg-primary-500/20"
-                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                          />
-                        )}
+                        <IconComponent className="w-5 h-5" />
                       </motion.div>
                       
                       {/* Activity content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-900 group-hover:text-primary-800 transition-colors">
-                              {getActivityDescription(activity)}
-                            </h4>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {activity.description || activity.clientName || activity.attendanceType || activity.target || 'Ação do sistema'}
-                            </p>
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-gray-900 group-hover:text-primary-800 transition-colors truncate">
+                            {getActivityDescription(activity)}
+                          </h4>
+                          <div className="flex items-center gap-2 text-primary-600">
+                            <Clock className="w-4 h-4" />
+                            <span className="font-semibold text-sm truncate">
+                              {formatRelativeTime(activity.createdAt || activity.timestamp || activity.datetime || activity.date)}
+                            </span>
                           </div>
-                          <motion.div
-                            className="flex items-center gap-1 text-xs text-gray-500 bg-gray-100/50 px-2 py-1 rounded-full"
-                            initial={{ opacity: 0.7 }}
-                            whileHover={{ opacity: 1 }}
-                          >
-                            <Clock className="w-3 h-3" />
-                            {formatRelativeTime(activity.createdAt || activity.timestamp || activity.datetime || activity.date)}
-                          </motion.div>
                         </div>
                         
-                        {/* Activity metadata */}
-                        {activity.metadata && (
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            {activity.metadata.clientId && (
-                              <div className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                <span>Cliente #{activity.metadata.clientId}</span>
-                              </div>
-                            )}
-                            {activity.metadata.value && (
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="w-3 h-3" />
-                                <span>R$ {activity.metadata.value}</span>
-                              </div>
-                            )}
-                            {activity.metadata.status && (
-                              <span className={`px-2 py-0.5 rounded-full font-medium ${
-                                activity.metadata.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                activity.metadata.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {activity.metadata.status}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center justify-between text-sm text-gray-500">
+                          <span className="truncate">
+                            {activity.target || activity.clientName || activity.client?.name || activity.description || 'Cliente não informado'}
+                          </span>
+                        </div>
                       </div>
                       
-                      {/* Action indicator */}
+                      {/* Indicador de hover */}
                       <motion.div
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
                         initial={{ x: 10 }}
@@ -1456,7 +1573,10 @@ const RecentActivity = ({ activities = [] }) => {
                       >
                         <ArrowUpIcon className="w-4 h-4 text-primary-400 rotate-45" />
                       </motion.div>
-                    </motion.div>
+                    </div>
+                    
+                    {/* Efeito de brilho no hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-100/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none -z-10" />
                   </motion.div>
                 );
               })}
@@ -1466,32 +1586,26 @@ const RecentActivity = ({ activities = [] }) => {
           )}
         </div>
 
-        {/* Footer - Activity summary */}
+        {/* Footer statistics */}
         {activities.length > 0 && (
           <motion.div 
             className="mt-6 pt-6 border-t border-gray-200/50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
+            transition={{ delay: 0.8 }}
           >
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <p className="text-xl font-bold text-primary-600">
+                <p className="text-2xl font-bold text-primary-600">
                   {activities.length}
                 </p>
-                <p className="text-xs text-gray-600">Total de Atividades</p>
+                <p className="text-sm text-gray-600">Atividades Recentes</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-emerald-600">
-                  {activities.filter(a => a.type?.includes('completed')).length}
-                </p>
-                <p className="text-xs text-gray-600">Concluídos</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-blue-600">
+                <p className="text-2xl font-bold text-primary-600">
                   {activities.filter(a => new Date() - new Date(a.createdAt || a.timestamp || a.datetime || a.date) < 86400000).length}
                 </p>
-                <p className="text-xs text-gray-600">Hoje</p>
+                <p className="text-sm text-gray-600">Hoje</p>
               </div>
             </div>
           </motion.div>
@@ -1529,6 +1643,8 @@ const Dashboard = () => {
   const [insights, setInsights] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
   const [clientRanking, setClientRanking] = useState([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastError, setLastError] = useState(null);
   
   // Estado para filtros de data
   const [filters, setFilters] = useState({
@@ -1538,12 +1654,50 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    console.log('Dashboard - useEffect inicial disparado');
     loadDashboardData();
   }, []);
 
+  // Função para retry automático quando há falha no carregamento
+  const retryLoadData = async () => {
+    if (retryCount < 3) {
+      console.log(`Dashboard - Tentativa de retry ${retryCount + 1}/3`);
+      setRetryCount(prev => prev + 1);
+      await loadDashboardData();
+    } else {
+      console.error('Dashboard - Máximo de tentativas atingido');
+    }
+  };
+
+  // Verificar se é necessário retry quando os dados não carregam
+  useEffect(() => {
+    console.log('Dashboard - useEffect retry check:', {
+      loading,
+      chartsLoading,
+      monthlyLength: performanceData.monthly.length,
+      retryCount
+    });
+    
+    // Só verificar retry após AMBOS loading e chartsLoading estarem false por um tempo
+    if (!loading && !chartsLoading && performanceData.monthly.length === 0 && retryCount < 3) {
+      console.log('Dashboard - Dados de analytics vazios, agendando retry...');
+      const retryTimer = setTimeout(() => {
+        console.log('Dashboard - Executando retry automático');
+        retryLoadData();
+      }, 5000); // Aumentei para 5 segundos para dar mais tempo
+
+      return () => {
+        console.log('Dashboard - Cancelando timer de retry');
+        clearTimeout(retryTimer);
+      };
+    }
+  }, [loading, chartsLoading, performanceData.monthly.length, retryCount]);
+
   const loadDashboardData = async (customFilters = null) => {
+    console.log('Dashboard - loadDashboardData iniciado', { customFilters, filters });
     try {
       setLoading(true);
+      console.log('Dashboard - Loading definido como true');
       
       // Usar filtros customizados ou os filtros atuais
       const queryFilters = customFilters || filters;
@@ -1553,9 +1707,13 @@ const Dashboard = () => {
       if (queryFilters.dateTo) params.append('dateTo', queryFilters.dateTo);
       if (queryFilters.period) params.append('period', queryFilters.period);
       
+      console.log('Dashboard - Parâmetros de busca:', params.toString());
+      
       // 1. Buscar estatísticas principais primeiro (mais rápido)
+      console.log('Dashboard - Buscando estatísticas principais...');
       const statsResponse = await api.get(`/dashboard/stats?${params.toString()}`);
       const statsData = statsResponse.data;
+      console.log('Dashboard - Estatísticas recebidas:', statsData);
       
       setStats({
         totalClients: statsData.stats.totalClients || 0,
@@ -1573,13 +1731,24 @@ const Dashboard = () => {
       });
 
       // Atividades recentes (já vem do stats)
+      console.log('Dashboard - Raw activities data:', JSON.stringify(statsData.activities, null, 2));
       setRecentActivities(statsData.activities || []);
+      
+      // Debug das atividades processadas
+      if (statsData.activities && statsData.activities.length > 0) {
+        console.log('Dashboard - Primeira atividade:', statsData.activities[0]);
+        console.log('Dashboard - Campos disponíveis:', Object.keys(statsData.activities[0]));
+      }
 
       // Dashboard básico está carregado, pode mostrar o conteúdo
       setLoading(false);
+      console.log('Dashboard - Loading definido como false, iniciando carregamento de gráficos');
 
       // 2. Carregamento em paralelo dos dados mais pesados com timeout individual
       setChartsLoading(true);
+      console.log('Dashboard - ChartsLoading definido como true');
+      
+      console.log('Dashboard - Iniciando Promise.allSettled para gráficos...');
       const [chartData, servicesData, clientRanking] = await Promise.allSettled([
         // Gráfico mensal com timeout estendido
         api.get('/dashboard/chart-data', {
@@ -1593,22 +1762,50 @@ const Dashboard = () => {
         }),
         // Ranking de clientes
         api.get('/dashboard/client-ranking', {
+          params: customFilters || filters,
           timeout: 20000
         })
       ]);
+
+      console.log('Dashboard - Promise.allSettled concluído');
+      console.log('Dashboard - Chart Data Status:', chartData.status);
+      console.log('Dashboard - Services Data Status:', servicesData.status);
+      console.log('Dashboard - Client Ranking Status:', clientRanking.status);
 
       // Processar resultados com fallback
       const chartResult = chartData.status === 'fulfilled' ? chartData.value.data : [];
       const servicesResult = servicesData.status === 'fulfilled' ? servicesData.value.data : [];
       const rankingResult = clientRanking.status === 'fulfilled' ? clientRanking.value.data : [];
 
+      // Log detalhado dos dados recebidos
+      console.log('Dashboard - Chart Data Result:', chartResult);
+      console.log('Dashboard - Services Data Result:', servicesResult);
+      console.log('Dashboard - Client Ranking Result:', rankingResult);
+      console.log('Dashboard - Client Ranking RAW RESPONSE:', JSON.stringify(rankingResult, null, 2));
+      
+      // Análise da estrutura dos dados de client ranking
+      if (Array.isArray(rankingResult) && rankingResult.length > 0) {
+        console.log('Dashboard - Primeiro cliente estrutura:', {
+          originalObject: rankingResult[0],
+          keys: Object.keys(rankingResult[0]),
+          attendancesField: rankingResult[0].attendances,
+          attendanceCountField: rankingResult[0].attendanceCount
+        });
+      }
+
       setPerformanceData({
-        monthly: chartResult,
-        services: servicesResult
+        monthly: Array.isArray(chartResult) ? chartResult : [],
+        services: Array.isArray(servicesResult) ? servicesResult : []
       });
 
-      setClientRanking(rankingResult);
+      setClientRanking(Array.isArray(rankingResult) ? rankingResult : []);
       setChartsLoading(false);
+      
+      console.log('Dashboard - ChartsLoading definido como false');
+      console.log('Dashboard - PerformanceData atualizado:', {
+        monthly: Array.isArray(chartResult) ? chartResult : [],
+        services: Array.isArray(servicesResult) ? servicesResult : []
+      });
 
       // Log de erros específicos sem quebrar o dashboard
       if (chartData.status === 'rejected') {
@@ -1661,8 +1858,14 @@ const Dashboard = () => {
 
       setInsights(dynamicInsights);
 
+      // Resetar retry count e error quando carregamento é bem-sucedido
+      setRetryCount(0);
+      setLastError(null);
+
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
+      setLastError(error);
+      
       // Dados fallback para demonstração
       setStats({
         totalClients: 0,
@@ -1857,7 +2060,12 @@ const Dashboard = () => {
           className={`grid grid-cols-1 gap-[clamp(1rem,2vw,1.5rem)] ${insights.length > 0 ? 'xl:grid-cols-3' : ''}`}
         >
           <div className={insights.length > 0 ? 'xl:col-span-2' : 'col-span-1'}>
-            <PerformanceMetrics data={performanceData} loading={chartsLoading} />
+            <PerformanceMetrics 
+              data={performanceData} 
+              loading={chartsLoading || loading} 
+              retryCount={retryCount}
+              onRetry={retryLoadData}
+            />
           </div>
           {insights.length > 0 && (
             <motion.div 
@@ -1913,7 +2121,7 @@ const Dashboard = () => {
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
+                transition={{ repeat: Infinity, duration: 2, type: 'tween', ease: 'easeInOut' }}
                 className="w-2 h-2 bg-green-500 rounded-full"
               />
               <span className="font-medium">Sistema online</span>

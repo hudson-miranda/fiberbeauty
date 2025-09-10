@@ -101,9 +101,9 @@ const Login = () => {
                     className="text-gray-400 hover:text-gray-600 focus:outline-none"
                   >
                     {showPassword ? (
-                      <EyeSlashIcon className="h-5 w-5" />
-                    ) : (
                       <EyeIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeSlashIcon className="h-5 w-5" />
                     )}
                   </button>
                 }

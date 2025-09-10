@@ -1,3 +1,5 @@
+// Carregar arquivos .env na ordem correta (prioridade: .env.local > .env)
+require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
