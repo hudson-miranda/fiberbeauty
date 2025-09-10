@@ -459,12 +459,12 @@ const PerformanceMetrics = ({ data, loading = false, retryCount = 0, onRetry }) 
 
   // Debug: Log dos dados recebidos
   useEffect(() => {
-    console.log('PerformanceMetrics - Data received:', data);
-    console.log('PerformanceMetrics - Loading:', loading);
-    console.log('PerformanceMetrics - RetryCount:', retryCount);
+    ////console.log('PerformanceMetrics - Data received:', data);
+    ////console.log('PerformanceMetrics - Loading:', loading);
+    ////console.log('PerformanceMetrics - RetryCount:', retryCount);
     if (data) {
-      console.log('PerformanceMetrics - data.monthly:', data.monthly);
-      console.log('PerformanceMetrics - data.services:', data.services);
+      ////console.log('PerformanceMetrics - data.monthly:', data.monthly);
+      ////console.log('PerformanceMetrics - data.services:', data.services);
     }
   }, [data, loading, retryCount]);
 
@@ -472,7 +472,7 @@ const PerformanceMetrics = ({ data, loading = false, retryCount = 0, onRetry }) 
   useEffect(() => {
     if (!loading) {
       const waitTimer = setTimeout(() => {
-        console.log('PerformanceMetrics - Tempo de espera concluído');
+        ////console.log('PerformanceMetrics - Tempo de espera concluído');
         setHasWaitedForData(true);
       }, 2000); // Aguarda 2 segundos após loading false
 
@@ -1370,7 +1370,7 @@ const TopClientsRanking = ({ clients = [] }) => {
 };
 
 // Componente RecentActivity aprimorado
-const RecentActivity = ({ activities = [] }) => {
+const RecentActivity = ({ activities = [], onShowAllActivities }) => {
   const navigate = useNavigate();
   const [ref, controls] = useScrollAnimation();
 
@@ -1481,20 +1481,36 @@ const RecentActivity = ({ activities = [] }) => {
     >
       <Card className="p-6 bg-gradient-to-br from-white to-gray-50/30 border-0 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-6 gap-2">
+          <div className="flex items-center gap-3 flex-shrink min-w-0">
             <div className="p-2 bg-primary-100 rounded-xl">
               <Activity className="w-6 h-6 text-primary-600" />
             </div>
-            <div>
-              <h3 className="text-[clamp(1rem,2.5vw,1.25rem)] font-bold text-gray-900">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-[clamp(1rem,2.5vw,1.25rem)] font-bold text-gray-900 truncate">
                 Atividades Recentes
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm truncate">
                 Últimas ações no sistema
               </p>
             </div>
           </div>
+
+          <motion.div
+            className="flex-shrink-0"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <a
+              href="#"
+              role="button"
+              onClick={(e) => { e.preventDefault(); onShowAllActivities && onShowAllActivities(); }}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/20 text-primary-600 border border-primary-200 hover:bg-primary-50 hover:text-primary-300 hover:border-primary-300 transition-all duration-200 px-3 py-2"
+            >
+              <EyeIcon className="h-4 w-4" />
+              <span className="hidden sm:inline truncate">Ver Todos</span>
+            </a>
+          </motion.div>
         </div>
 
         {/* Lista de atividades */}
@@ -1510,14 +1526,14 @@ const RecentActivity = ({ activities = [] }) => {
                 const { icon: IconComponent, color } = getActivityIcon(activity, index);
                 
                 // Debug log para cada atividade
-                console.log(`Activity ${index}:`, {
-                  id: activity.id,
-                  type: activity.type,
-                  target: activity.target,
-                  clientName: activity.clientName,
-                  description: activity.description,
-                  allFields: Object.keys(activity)
-                });
+                //console.log(`Activity ${index}:`, {
+                //  id: activity.id,
+                //  type: activity.type,
+                //  target: activity.target,
+                //  clientName: activity.clientName,
+                //  description: activity.description,
+                //  allFields: Object.keys(activity)
+                //});
                 
                 return (
                   <motion.div
@@ -1646,6 +1662,34 @@ const Dashboard = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState(null);
   
+  // Estado para o modal de atividades
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [allActivities, setAllActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activityFilters, setActivityFilters] = useState({
+    type: 'all',
+    dateFrom: '',
+    dateTo: '',
+    limit: 20,
+    offset: 0
+  });
+
+  // Função para fechar modal e limpar dados
+  const closeActivitiesModal = () => {
+    setShowActivitiesModal(false);
+    // Limpar dados quando fechar para evitar problemas de estado
+    setTimeout(() => {
+      setAllActivities([]);
+      setActivityFilters({
+        type: 'all',
+        dateFrom: '',
+        dateTo: '',
+        limit: 20,
+        offset: 0
+      });
+    }, 300); // Aguarda animação de saída
+  };
+  
   // Estado para filtros de data
   const [filters, setFilters] = useState({
     dateFrom: '',
@@ -1654,14 +1698,14 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    console.log('Dashboard - useEffect inicial disparado');
+    //console.log('Dashboard - useEffect inicial disparado');
     loadDashboardData();
   }, []);
 
   // Função para retry automático quando há falha no carregamento
   const retryLoadData = async () => {
     if (retryCount < 3) {
-      console.log(`Dashboard - Tentativa de retry ${retryCount + 1}/3`);
+      //console.log(`Dashboard - Tentativa de retry ${retryCount + 1}/3`);
       setRetryCount(prev => prev + 1);
       await loadDashboardData();
     } else {
@@ -1671,33 +1715,33 @@ const Dashboard = () => {
 
   // Verificar se é necessário retry quando os dados não carregam
   useEffect(() => {
-    console.log('Dashboard - useEffect retry check:', {
-      loading,
-      chartsLoading,
-      monthlyLength: performanceData.monthly.length,
-      retryCount
-    });
+    //console.log('Dashboard - useEffect retry check:', {
+      //loading,
+      //chartsLoading,
+      //monthlyLength: performanceData.monthly.length,
+      //retryCount
+    //});
     
     // Só verificar retry após AMBOS loading e chartsLoading estarem false por um tempo
     if (!loading && !chartsLoading && performanceData.monthly.length === 0 && retryCount < 3) {
-      console.log('Dashboard - Dados de analytics vazios, agendando retry...');
+      //console.log('Dashboard - Dados de analytics vazios, agendando retry...');
       const retryTimer = setTimeout(() => {
-        console.log('Dashboard - Executando retry automático');
+        //console.log('Dashboard - Executando retry automático');
         retryLoadData();
       }, 5000); // Aumentei para 5 segundos para dar mais tempo
 
       return () => {
-        console.log('Dashboard - Cancelando timer de retry');
+        //console.log('Dashboard - Cancelando timer de retry');
         clearTimeout(retryTimer);
       };
     }
   }, [loading, chartsLoading, performanceData.monthly.length, retryCount]);
 
   const loadDashboardData = async (customFilters = null) => {
-    console.log('Dashboard - loadDashboardData iniciado', { customFilters, filters });
+    //console.log('Dashboard - loadDashboardData iniciado', { customFilters, filters });
     try {
       setLoading(true);
-      console.log('Dashboard - Loading definido como true');
+      //console.log('Dashboard - Loading definido como true');
       
       // Usar filtros customizados ou os filtros atuais
       const queryFilters = customFilters || filters;
@@ -1707,13 +1751,13 @@ const Dashboard = () => {
       if (queryFilters.dateTo) params.append('dateTo', queryFilters.dateTo);
       if (queryFilters.period) params.append('period', queryFilters.period);
       
-      console.log('Dashboard - Parâmetros de busca:', params.toString());
+      //console.log('Dashboard - Parâmetros de busca:', params.toString());
       
       // 1. Buscar estatísticas principais primeiro (mais rápido)
-      console.log('Dashboard - Buscando estatísticas principais...');
+      //console.log('Dashboard - Buscando estatísticas principais...');
       const statsResponse = await api.get(`/dashboard/stats?${params.toString()}`);
       const statsData = statsResponse.data;
-      console.log('Dashboard - Estatísticas recebidas:', statsData);
+      //console.log('Dashboard - Estatísticas recebidas:', statsData);
       
       setStats({
         totalClients: statsData.stats.totalClients || 0,
@@ -1731,24 +1775,24 @@ const Dashboard = () => {
       });
 
       // Atividades recentes (já vem do stats)
-      console.log('Dashboard - Raw activities data:', JSON.stringify(statsData.activities, null, 2));
+      //console.log('Dashboard - Raw activities data:', JSON.stringify(statsData.activities, null, 2));
       setRecentActivities(statsData.activities || []);
       
       // Debug das atividades processadas
       if (statsData.activities && statsData.activities.length > 0) {
-        console.log('Dashboard - Primeira atividade:', statsData.activities[0]);
-        console.log('Dashboard - Campos disponíveis:', Object.keys(statsData.activities[0]));
+        //console.log('Dashboard - Primeira atividade:', statsData.activities[0]);
+        //console.log('Dashboard - Campos disponíveis:', Object.keys(statsData.activities[0]));
       }
 
       // Dashboard básico está carregado, pode mostrar o conteúdo
       setLoading(false);
-      console.log('Dashboard - Loading definido como false, iniciando carregamento de gráficos');
+      //console.log('Dashboard - Loading definido como false, iniciando carregamento de gráficos');
 
       // 2. Carregamento em paralelo dos dados mais pesados com timeout individual
       setChartsLoading(true);
-      console.log('Dashboard - ChartsLoading definido como true');
+      //console.log('Dashboard - ChartsLoading definido como true');
       
-      console.log('Dashboard - Iniciando Promise.allSettled para gráficos...');
+      //console.log('Dashboard - Iniciando Promise.allSettled para gráficos...');
       const [chartData, servicesData, clientRanking] = await Promise.allSettled([
         // Gráfico mensal com timeout estendido
         api.get('/dashboard/chart-data', {
@@ -1767,10 +1811,10 @@ const Dashboard = () => {
         })
       ]);
 
-      console.log('Dashboard - Promise.allSettled concluído');
-      console.log('Dashboard - Chart Data Status:', chartData.status);
-      console.log('Dashboard - Services Data Status:', servicesData.status);
-      console.log('Dashboard - Client Ranking Status:', clientRanking.status);
+      //console.log('Dashboard - Promise.allSettled concluído');
+      //console.log('Dashboard - Chart Data Status:', chartData.status);
+      //console.log('Dashboard - Services Data Status:', servicesData.status);
+      //console.log('Dashboard - Client Ranking Status:', clientRanking.status);
 
       // Processar resultados com fallback
       const chartResult = chartData.status === 'fulfilled' ? chartData.value.data : [];
@@ -1778,19 +1822,19 @@ const Dashboard = () => {
       const rankingResult = clientRanking.status === 'fulfilled' ? clientRanking.value.data : [];
 
       // Log detalhado dos dados recebidos
-      console.log('Dashboard - Chart Data Result:', chartResult);
-      console.log('Dashboard - Services Data Result:', servicesResult);
-      console.log('Dashboard - Client Ranking Result:', rankingResult);
-      console.log('Dashboard - Client Ranking RAW RESPONSE:', JSON.stringify(rankingResult, null, 2));
+      //console.log('Dashboard - Chart Data Result:', chartResult);
+      //console.log('Dashboard - Services Data Result:', servicesResult);
+      //console.log('Dashboard - Client Ranking Result:', rankingResult);
+      //console.log('Dashboard - Client Ranking RAW RESPONSE:', JSON.stringify(rankingResult, null, 2));
       
       // Análise da estrutura dos dados de client ranking
       if (Array.isArray(rankingResult) && rankingResult.length > 0) {
-        console.log('Dashboard - Primeiro cliente estrutura:', {
-          originalObject: rankingResult[0],
-          keys: Object.keys(rankingResult[0]),
-          attendancesField: rankingResult[0].attendances,
-          attendanceCountField: rankingResult[0].attendanceCount
-        });
+        //console.log('Dashboard - Primeiro cliente estrutura:', {
+          //originalObject: rankingResult[0],
+          //keys: Object.keys(rankingResult[0]),
+          //attendancesField: rankingResult[0].attendances,
+          //attendanceCountField: rankingResult[0].attendanceCount
+        //});
       }
 
       setPerformanceData({
@@ -1801,11 +1845,11 @@ const Dashboard = () => {
       setClientRanking(Array.isArray(rankingResult) ? rankingResult : []);
       setChartsLoading(false);
       
-      console.log('Dashboard - ChartsLoading definido como false');
-      console.log('Dashboard - PerformanceData atualizado:', {
-        monthly: Array.isArray(chartResult) ? chartResult : [],
-        services: Array.isArray(servicesResult) ? servicesResult : []
-      });
+      //console.log('Dashboard - ChartsLoading definido como false');
+      //console.log('Dashboard - PerformanceData atualizado:', {
+        //monthly: Array.isArray(chartResult) ? chartResult : [],
+        //services: Array.isArray(servicesResult) ? servicesResult : []
+      //});
 
       // Log de erros específicos sem quebrar o dashboard
       if (chartData.status === 'rejected') {
@@ -1910,9 +1954,382 @@ const Dashboard = () => {
     loadDashboardData(defaultFilters);
   };
 
+  // Função para buscar todas as atividades com filtros
+  const loadAllActivities = async (customFilters = null) => {
+    //console.log('Dashboard - loadAllActivities iniciado', { customFilters, activityFilters });
+    try {
+      setActivitiesLoading(true);
+      
+      // Usar filtros customizados ou os filtros atuais de atividades
+      const queryFilters = customFilters || activityFilters;
+      const params = new URLSearchParams();
+      
+      if (queryFilters.type && queryFilters.type !== 'all') params.append('type', queryFilters.type);
+      if (queryFilters.dateFrom) params.append('dateFrom', queryFilters.dateFrom);
+      if (queryFilters.dateTo) params.append('dateTo', queryFilters.dateTo);
+      if (queryFilters.limit) params.append('limit', queryFilters.limit);
+      if (queryFilters.offset) params.append('offset', queryFilters.offset);
+      
+      //console.log('Dashboard - Parâmetros de busca de atividades:', params.toString());
+      
+      const response = await api.get(`/dashboard/activities?${params.toString()}`);
+      const activitiesData = response.data;
+      //console.log('Dashboard - Atividades recebidas:', activitiesData);
+      
+      // Se offset > 0, significa que estamos carregando mais, então fazemos append
+      if (queryFilters.offset > 0) {
+        setAllActivities(prev => [...prev, ...(activitiesData.activities || [])]);
+      } else {
+        // Caso contrário, substitui completamente
+        setAllActivities(activitiesData.activities || []);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar atividades:', error);
+      // Se offset > 0, não limpa as atividades existentes em caso de erro
+      if (!customFilters?.offset && !activityFilters.offset) {
+        setAllActivities([]);
+      }
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  // Handler para aplicar filtros de atividades
+  const handleActivityFiltersChange = (newFilters) => {
+    setActivityFilters(newFilters);
+  };
+
+  const handleApplyActivityFilters = () => {
+    const filtersWithReset = { ...activityFilters, offset: 0 }; // Reset offset
+    setActivityFilters(filtersWithReset);
+    loadAllActivities(filtersWithReset);
+  };
+
+  const handleClearActivityFilters = () => {
+    const defaultFilters = {
+      type: 'all',
+      dateFrom: '',
+      dateTo: '',
+      limit: 20,
+      offset: 0
+    };
+    setActivityFilters(defaultFilters);
+    loadAllActivities(defaultFilters);
+  };
+
   if (loading) {
     return <DashboardSkeleton />;
   }
+
+  // Componente Modal para todas as atividades
+  const ActivitiesModal = () => {
+    const activityTypes = [
+      { value: 'all', label: 'Todas as atividades' },
+      { value: 'attendance_created', label: 'Atendimentos criados' },
+      { value: 'attendance_updated', label: 'Atendimentos atualizados' },
+      { value: 'client_created', label: 'Clientes criados' },
+      { value: 'client_updated', label: 'Clientes atualizados' },
+      { value: 'user_created', label: 'Usuários criados' },
+      { value: 'user_updated', label: 'Usuários atualizados' },
+      { value: 'form_created', label: 'Formulários criados' },
+      { value: 'form_updated', label: 'Formulários atualizados' }
+    ];
+
+    // Função para formatar tempo relativo
+    const formatRelativeTime = (date) => {
+      if (!date) return 'Data inválida';
+      
+      const now = new Date();
+      const activityDate = new Date(date);
+      const diffTime = Math.abs(now - activityDate);
+      const diffMinutes = Math.ceil(diffTime / (1000 * 60));
+      const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffMinutes < 60) {
+        return `${diffMinutes === 1 ? 'há 1 minuto' : `há ${diffMinutes}m`}`;
+      } else if (diffHours < 24) {
+        return `${diffHours === 1 ? 'há 1 hora' : `há ${diffHours}h`}`;
+      } else {
+        return `${diffDays === 1 ? 'ontem' : `há ${diffDays}d`}`;
+      }
+    };
+
+    // Função para obter ícone e cor baseado no tipo de atividade
+    const getActivityTypeIcon = (type) => {
+      const iconMap = {
+        'attendance_created': { icon: Calendar, color: 'text-blue-600' },
+        'attendance_updated': { icon: Activity, color: 'text-blue-500' },
+        'client_created': { icon: UserPlus, color: 'text-green-600' },
+        'client_updated': { icon: Users2, color: 'text-green-500' },
+        'user_created': { icon: UserPlus, color: 'text-purple-600' },
+        'user_updated': { icon: Users2, color: 'text-purple-500' },
+        'form_created': { icon: FileText, color: 'text-orange-600' },
+        'form_updated': { icon: FileText, color: 'text-orange-500' }
+      };
+      
+      return iconMap[type] || { icon: Activity, color: 'text-gray-600' };
+    };
+
+    const formatDate = (date) => {
+      if (!date) return '';
+      return new Date(date).toISOString().split('T')[0];
+    };
+
+    // Função para aplicar filtros de data pré-definidos
+    const applyDatePreset = (days) => {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - days);
+      
+      const newFilters = {
+        ...activityFilters,
+        dateFrom: formatDate(start),
+        dateTo: formatDate(end),
+        offset: 0 // Reset offset quando aplicar novo filtro
+      };
+      
+      setActivityFilters(newFilters);
+      loadAllActivities(newFilters);
+    };
+
+    // Carregar atividades quando o modal abrir pela primeira vez
+    useEffect(() => {
+      if (showActivitiesModal && allActivities.length === 0) {
+        loadAllActivities();
+      }
+    }, [showActivitiesModal]); // Remover dependências desnecessárias
+
+    return (
+      <AnimatePresence>
+        {showActivitiesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && closeActivitiesModal()}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+            >
+              {/* Header do Modal */}
+              <div className="bg-gradient-to-r from-primary-600 to-gold-600 text-white p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-xl">
+                      <Activity className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Todas as Atividades</h2>
+                      <p className="text-white/80 text-sm">Visualize e filtre todas as atividades do sistema</p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={closeActivitiesModal}
+                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Filtros */}
+              <div className="p-6 border-b border-gray-200 bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Filtro por tipo */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Atividade
+                    </label>
+                    <select
+                      value={activityFilters.type}
+                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      {activityTypes.map(type => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Data inicial */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data Inicial
+                    </label>
+                    <input
+                      type="date"
+                      value={activityFilters.dateFrom}
+                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, dateFrom: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+
+                  {/* Data final */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data Final
+                    </label>
+                    <input
+                      type="date"
+                      value={activityFilters.dateTo}
+                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, dateTo: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+
+                  {/* Botões de ação */}
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      onClick={handleApplyActivityFilters}
+                      loading={activitiesLoading}
+                      className="bg-primary-600 hover:bg-primary-700 text-white"
+                      size="sm"
+                    >
+                      Aplicar Filtros
+                    </Button>
+                    <Button
+                      onClick={handleClearActivityFilters}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Filtros rápidos por data */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filtros Rápidos
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'Hoje', days: 1 },
+                      { label: 'Últimos 7 dias', days: 7 },
+                      { label: 'Últimos 30 dias', days: 30 },
+                      { label: 'Últimos 90 dias', days: 90 }
+                    ].map((preset) => (
+                      <motion.button
+                        key={preset.days}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => applyDatePreset(preset.days)}
+                        className="px-3 py-1 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        {preset.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de atividades */}
+              <div className="flex-1 overflow-y-auto p-6 max-h-96">
+                {activitiesLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-300 rounded-lg"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : allActivities.length > 0 ? (
+                  <motion.div 
+                    variants={staggerContainer}
+                    initial="initial"
+                    animate="animate"
+                    className="space-y-4"
+                  >
+                    {allActivities.map((activity, index) => {
+                      const { icon: TypeIcon, color: typeColor } = getActivityTypeIcon(activity.type);
+                      
+                      return (
+                        <motion.div
+                          key={activity.id || index}
+                          variants={fadeInUp}
+                          whileHover={{ scale: 1.01 }}
+                          className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-primary-200 hover:shadow-md transition-all duration-200"
+                        >
+                          {/* Ícone da atividade */}
+                          <div className={`flex items-center justify-center w-12 h-12 rounded-lg bg-gray-100 ${typeColor}`}>
+                            <TypeIcon className="w-6 h-6" />
+                          </div>
+                          
+                          {/* Conteúdo da atividade */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="font-semibold text-gray-900 truncate">
+                                {activity.description || activityTypes.find(t => t.value === activity.type)?.label || 'Atividade'}
+                              </h4>
+                              <span className="text-sm text-gray-500 flex-shrink-0">
+                                {formatRelativeTime(activity.createdAt || activity.datetime)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm text-gray-600">
+                              <span className="truncate">
+                                {activity.clientName || activity.userName || activity.target || 'Sistema'}
+                              </span>
+                              <span className="text-xs text-gray-400 flex-shrink-0">
+                                {activity.type}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </motion.div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                      Nenhuma atividade encontrada
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      Tente ajustar os filtros para encontrar atividades
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>
+                    {allActivities.length} atividade(s) encontrada(s)
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        const newFilters = { ...activityFilters, limit: activityFilters.limit + 20 };
+                        setActivityFilters(newFilters);
+                        loadAllActivities(newFilters);
+                      }}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Carregar mais
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  };
 
   return (
     <motion.div 
@@ -2087,7 +2504,10 @@ const Dashboard = () => {
           className="grid grid-cols-1 xl:grid-cols-2 gap-[clamp(1rem,2vw,1.5rem)]"
         >
           <TopClientsRanking clients={clientRanking} />
-          <RecentActivity activities={recentActivities} />
+          <RecentActivity 
+            activities={recentActivities} 
+            onShowAllActivities={() => setShowActivitiesModal(true)}
+          />
         </motion.div>
 
         {/* Seção NPS com Animação */}
@@ -2129,6 +2549,9 @@ const Dashboard = () => {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Modal de Atividades */}
+      <ActivitiesModal />
     </motion.div>
   );
 };

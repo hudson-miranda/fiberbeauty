@@ -13,5 +13,6 @@ router.get('/stats', dashboardController.getStats);
 router.get('/chart-data', dashboardController.getChartData);
 router.get('/client-ranking', dashboardController.getClientRanking);
 router.get('/services-distribution', dashboardController.getServicesDistribution);
+router.get('/activities', dashboardController.getAllActivities);
 
 module.exports = router;

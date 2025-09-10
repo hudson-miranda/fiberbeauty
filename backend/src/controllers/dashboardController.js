@@ -25,37 +25,154 @@ const dashboardController = {
         })
       ]);
 
-      // Atividades recentes (limitadas)
-      const recentAttendances = await prisma.attendance.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          client: {
-            select: { firstName: true, lastName: true }
-          },
-          user: {
-            select: { name: true }
+      // Atividades recentes (múltiplos tipos)
+      const [recentAttendances, recentClients, recentUsers, recentForms] = await Promise.all([
+        // Atendimentos recentes
+        prisma.attendance.findMany({
+          take: 3,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            client: {
+              select: { firstName: true, lastName: true }
+            },
+            user: {
+              select: { name: true }
+            }
           }
-        }
-      });
+        }),
+        // Clientes recentes
+        prisma.client.findMany({
+          take: 2,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, firstName: true, lastName: true, createdAt: true, updatedAt: true }
+        }),
+        // Usuários recentes
+        prisma.user.findMany({
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, createdAt: true, updatedAt: true }
+        }),
+        // Formulários recentes
+        prisma.attendanceForm.findMany({
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, createdAt: true, updatedAt: true }
+        })
+      ]);
 
-      // Formatar atividades
-      const activities = recentAttendances.map(attendance => {
+      // Formatar todas as atividades
+      const activities = [];
+
+      // Atividades de atendimentos
+      recentAttendances.forEach(attendance => {
         const clientName = attendance.client 
           ? `${attendance.client.firstName || ''} ${attendance.client.lastName || ''}`.trim()
           : 'Cliente não informado';
         
-        return {
+        activities.push({
           id: `attendance-${attendance.id}`,
           type: 'attendance_created',
-          description: 'Atendimento realizado para:',
+          description: 'Novo atendimento realizado',
           target: clientName || 'Cliente não informado',
           clientName: clientName || 'Cliente não informado',
           date: new Date(attendance.createdAt).toLocaleDateString('pt-BR'),
           datetime: attendance.createdAt,
           createdAt: attendance.createdAt
-        };
+        });
       });
+
+      // Atividades de clientes
+      recentClients.forEach(client => {
+        const clientName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+        
+        // Cliente criado
+        activities.push({
+          id: `client-created-${client.id}`,
+          type: 'client_created',
+          description: 'Novo cliente cadastrado',
+          target: clientName || 'Cliente',
+          clientName: clientName || 'Cliente',
+          date: new Date(client.createdAt).toLocaleDateString('pt-BR'),
+          datetime: client.createdAt,
+          createdAt: client.createdAt
+        });
+
+        // Se cliente foi atualizado em data diferente da criação
+        if (client.updatedAt && new Date(client.updatedAt).getTime() !== new Date(client.createdAt).getTime()) {
+          activities.push({
+            id: `client-updated-${client.id}`,
+            type: 'client_updated',
+            description: 'Cliente atualizado',
+            target: clientName || 'Cliente',
+            clientName: clientName || 'Cliente',
+            date: new Date(client.updatedAt).toLocaleDateString('pt-BR'),
+            datetime: client.updatedAt,
+            createdAt: client.updatedAt
+          });
+        }
+      });
+
+      // Atividades de usuários
+      recentUsers.forEach(user => {
+        // Usuário criado
+        activities.push({
+          id: `user-created-${user.id}`,
+          type: 'user_created',
+          description: 'Novo usuário cadastrado',
+          target: user.name || 'Usuário',
+          clientName: user.name || 'Usuário',
+          date: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+          datetime: user.createdAt,
+          createdAt: user.createdAt
+        });
+
+        // Se usuário foi atualizado em data diferente da criação
+        if (user.updatedAt && new Date(user.updatedAt).getTime() !== new Date(user.createdAt).getTime()) {
+          activities.push({
+            id: `user-updated-${user.id}`,
+            type: 'user_updated',
+            description: 'Usuário atualizado',
+            target: user.name || 'Usuário',
+            clientName: user.name || 'Usuário',
+            date: new Date(user.updatedAt).toLocaleDateString('pt-BR'),
+            datetime: user.updatedAt,
+            createdAt: user.updatedAt
+          });
+        }
+      });
+
+      // Atividades de formulários
+      recentForms.forEach(form => {
+        // Formulário criado
+        activities.push({
+          id: `form-created-${form.id}`,
+          type: 'form_created',
+          description: 'Nova ficha cadastrada',
+          target: form.name || 'Ficha',
+          clientName: form.name || 'Ficha',
+          date: new Date(form.createdAt).toLocaleDateString('pt-BR'),
+          datetime: form.createdAt,
+          createdAt: form.createdAt
+        });
+
+        // Se formulário foi atualizado em data diferente da criação
+        if (form.updatedAt && new Date(form.updatedAt).getTime() !== new Date(form.createdAt).getTime()) {
+          activities.push({
+            id: `form-updated-${form.id}`,
+            type: 'form_updated',
+            description: 'Ficha atualizada',
+            target: form.name || 'Ficha',
+            clientName: form.name || 'Ficha',
+            date: new Date(form.updatedAt).toLocaleDateString('pt-BR'),
+            datetime: form.updatedAt,
+            createdAt: form.updatedAt
+          });
+        }
+      });
+
+      // Ordenar atividades por data (mais recentes primeiro) e limitar a 5
+      activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const limitedActivities = activities.slice(0, 5);
 
       // Calcular mudanças baseadas em dados reais
       const yesterday = new Date();
@@ -125,7 +242,7 @@ const dashboardController = {
 
       res.json({
         stats,
-        activities: activities.slice(0, 5), // Máximo 5 atividades
+        activities: limitedActivities, // Atividades já limitadas e ordenadas
         period: {
           start: new Date(new Date().getTime() - (30 * 24 * 60 * 60 * 1000)).toISOString(),
           end: new Date().toISOString()
@@ -429,6 +546,215 @@ const dashboardController = {
       ];
       
       res.json(fallbackServices);
+    }
+  },
+
+  // Buscar todas as atividades com filtros
+  async getAllActivities(req, res) {
+    try {
+      const prisma = getPrismaClient();
+      const { type, page = 1, limit = 20 } = req.query;
+      
+      const skip = (page - 1) * limit;
+      const take = Math.min(parseInt(limit), 50); // Máximo 50 por página
+
+      // Buscar dados de múltiplas tabelas
+      const [attendances, clients, users, forms] = await Promise.all([
+        // Atendimentos
+        prisma.attendance.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: type === 'attendance_created' ? take : 20,
+          skip: type === 'attendance_created' ? skip : 0,
+          include: {
+            client: {
+              select: { firstName: true, lastName: true }
+            },
+            user: {
+              select: { name: true }
+            }
+          }
+        }),
+        // Clientes
+        prisma.client.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: type && ['client_created', 'client_updated'].includes(type) ? take : 20,
+          skip: type && ['client_created', 'client_updated'].includes(type) ? skip : 0,
+          select: { id: true, firstName: true, lastName: true, createdAt: true, updatedAt: true }
+        }),
+        // Usuários
+        prisma.user.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: type && ['user_created', 'user_updated'].includes(type) ? take : 10,
+          skip: type && ['user_created', 'user_updated'].includes(type) ? skip : 0,
+          select: { id: true, name: true, createdAt: true, updatedAt: true }
+        }),
+        // Formulários
+        prisma.attendanceForm.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: type && ['form_created', 'form_updated'].includes(type) ? take : 10,
+          skip: type && ['form_created', 'form_updated'].includes(type) ? skip : 0,
+          select: { id: true, name: true, createdAt: true, updatedAt: true }
+        })
+      ]);
+
+      const activities = [];
+
+      // Processar atendimentos
+      if (!type || type === 'attendance_created') {
+        attendances.forEach(attendance => {
+          const clientName = attendance.client 
+            ? `${attendance.client.firstName || ''} ${attendance.client.lastName || ''}`.trim()
+            : 'Cliente não informado';
+          
+          activities.push({
+            id: `attendance-${attendance.id}`,
+            type: 'attendance_created',
+            description: 'Novo atendimento realizado',
+            target: clientName || 'Cliente não informado',
+            clientName: clientName || 'Cliente não informado',
+            date: new Date(attendance.createdAt).toLocaleDateString('pt-BR'),
+            datetime: attendance.createdAt,
+            createdAt: attendance.createdAt
+          });
+        });
+      }
+
+      // Processar clientes
+      if (!type || ['client_created', 'client_updated'].includes(type)) {
+        clients.forEach(client => {
+          const clientName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+          
+          // Cliente criado
+          if (!type || type === 'client_created') {
+            activities.push({
+              id: `client-created-${client.id}`,
+              type: 'client_created',
+              description: 'Novo cliente cadastrado',
+              target: clientName || 'Cliente',
+              clientName: clientName || 'Cliente',
+              date: new Date(client.createdAt).toLocaleDateString('pt-BR'),
+              datetime: client.createdAt,
+              createdAt: client.createdAt
+            });
+          }
+
+          // Cliente atualizado
+          if ((!type || type === 'client_updated') && 
+              client.updatedAt && 
+              new Date(client.updatedAt).getTime() !== new Date(client.createdAt).getTime()) {
+            activities.push({
+              id: `client-updated-${client.id}`,
+              type: 'client_updated',
+              description: 'Cliente atualizado',
+              target: clientName || 'Cliente',
+              clientName: clientName || 'Cliente',
+              date: new Date(client.updatedAt).toLocaleDateString('pt-BR'),
+              datetime: client.updatedAt,
+              createdAt: client.updatedAt
+            });
+          }
+        });
+      }
+
+      // Processar usuários
+      if (!type || ['user_created', 'user_updated'].includes(type)) {
+        users.forEach(user => {
+          // Usuário criado
+          if (!type || type === 'user_created') {
+            activities.push({
+              id: `user-created-${user.id}`,
+              type: 'user_created',
+              description: 'Novo usuário cadastrado',
+              target: user.name || 'Usuário',
+              clientName: user.name || 'Usuário',
+              date: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+              datetime: user.createdAt,
+              createdAt: user.createdAt
+            });
+          }
+
+          // Usuário atualizado
+          if ((!type || type === 'user_updated') && 
+              user.updatedAt && 
+              new Date(user.updatedAt).getTime() !== new Date(user.createdAt).getTime()) {
+            activities.push({
+              id: `user-updated-${user.id}`,
+              type: 'user_updated',
+              description: 'Usuário atualizado',
+              target: user.name || 'Usuário',
+              clientName: user.name || 'Usuário',
+              date: new Date(user.updatedAt).toLocaleDateString('pt-BR'),
+              datetime: user.updatedAt,
+              createdAt: user.updatedAt
+            });
+          }
+        });
+      }
+
+      // Processar formulários
+      if (!type || ['form_created', 'form_updated'].includes(type)) {
+        forms.forEach(form => {
+          // Formulário criado
+          if (!type || type === 'form_created') {
+            activities.push({
+              id: `form-created-${form.id}`,
+              type: 'form_created',
+              description: 'Nova ficha cadastrada',
+              target: form.name || 'Ficha',
+              clientName: form.name || 'Ficha',
+              date: new Date(form.createdAt).toLocaleDateString('pt-BR'),
+              datetime: form.createdAt,
+              createdAt: form.createdAt
+            });
+          }
+
+          // Formulário atualizado
+          if ((!type || type === 'form_updated') && 
+              form.updatedAt && 
+              new Date(form.updatedAt).getTime() !== new Date(form.createdAt).getTime()) {
+            activities.push({
+              id: `form-updated-${form.id}`,
+              type: 'form_updated',
+              description: 'Ficha atualizada',
+              target: form.name || 'Ficha',
+              clientName: form.name || 'Ficha',
+              date: new Date(form.updatedAt).toLocaleDateString('pt-BR'),
+              datetime: form.updatedAt,
+              createdAt: form.updatedAt
+            });
+          }
+        });
+      }
+
+      // Ordenar por data e aplicar paginação
+      activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      const startIndex = type ? 0 : skip;
+      const endIndex = type ? activities.length : startIndex + take;
+      const paginatedActivities = activities.slice(startIndex, endIndex);
+
+      // Contar total para paginação
+      const totalActivities = activities.length;
+      const totalPages = Math.ceil(totalActivities / take);
+
+      res.json({
+        activities: paginatedActivities,
+        pagination: {
+          page: parseInt(page),
+          limit: take,
+          total: totalActivities,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao buscar atividades:', error);
+      res.status(500).json({ 
+        error: 'Erro interno do servidor', 
+        code: 'INTERNAL_ERROR' 
+      });
     }
   }
 };
