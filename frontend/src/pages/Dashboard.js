@@ -457,22 +457,10 @@ const PerformanceMetrics = ({ data, loading = false, retryCount = 0, onRetry }) 
   const [hoveredData, setHoveredData] = useState(null);
   const [hasWaitedForData, setHasWaitedForData] = useState(false);
 
-  // Debug: Log dos dados recebidos
-  useEffect(() => {
-    ////console.log('PerformanceMetrics - Data received:', data);
-    ////console.log('PerformanceMetrics - Loading:', loading);
-    ////console.log('PerformanceMetrics - RetryCount:', retryCount);
-    if (data) {
-      ////console.log('PerformanceMetrics - data.monthly:', data.monthly);
-      ////console.log('PerformanceMetrics - data.services:', data.services);
-    }
-  }, [data, loading, retryCount]);
-
   // Aguardar um tempo antes de considerar dados como não disponíveis
   useEffect(() => {
     if (!loading) {
       const waitTimer = setTimeout(() => {
-        ////console.log('PerformanceMetrics - Tempo de espera concluído');
         setHasWaitedForData(true);
       }, 2000); // Aguarda 2 segundos após loading false
 
@@ -1525,16 +1513,6 @@ const RecentActivity = ({ activities = [], onShowAllActivities }) => {
               {activities.slice(0, 5).map((activity, index) => {
                 const { icon: IconComponent, color } = getActivityIcon(activity, index);
                 
-                // Debug log para cada atividade
-                //console.log(`Activity ${index}:`, {
-                //  id: activity.id,
-                //  type: activity.type,
-                //  target: activity.target,
-                //  clientName: activity.clientName,
-                //  description: activity.description,
-                //  allFields: Object.keys(activity)
-                //});
-                
                 return (
                   <motion.div
                     key={activity.id || index}
@@ -1698,14 +1676,12 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    //console.log('Dashboard - useEffect inicial disparado');
     loadDashboardData();
   }, []);
 
   // Função para retry automático quando há falha no carregamento
   const retryLoadData = async () => {
     if (retryCount < 3) {
-      //console.log(`Dashboard - Tentativa de retry ${retryCount + 1}/3`);
       setRetryCount(prev => prev + 1);
       await loadDashboardData();
     } else {
@@ -1714,34 +1690,22 @@ const Dashboard = () => {
   };
 
   // Verificar se é necessário retry quando os dados não carregam
-  useEffect(() => {
-    //console.log('Dashboard - useEffect retry check:', {
-      //loading,
-      //chartsLoading,
-      //monthlyLength: performanceData.monthly.length,
-      //retryCount
-    //});
-    
+  useEffect(() => {    
     // Só verificar retry após AMBOS loading e chartsLoading estarem false por um tempo
     if (!loading && !chartsLoading && performanceData.monthly.length === 0 && retryCount < 3) {
-      //console.log('Dashboard - Dados de analytics vazios, agendando retry...');
       const retryTimer = setTimeout(() => {
-        //console.log('Dashboard - Executando retry automático');
         retryLoadData();
       }, 5000); // Aumentei para 5 segundos para dar mais tempo
 
       return () => {
-        //console.log('Dashboard - Cancelando timer de retry');
         clearTimeout(retryTimer);
       };
     }
   }, [loading, chartsLoading, performanceData.monthly.length, retryCount]);
 
   const loadDashboardData = async (customFilters = null) => {
-    //console.log('Dashboard - loadDashboardData iniciado', { customFilters, filters });
     try {
       setLoading(true);
-      //console.log('Dashboard - Loading definido como true');
       
       // Usar filtros customizados ou os filtros atuais
       const queryFilters = customFilters || filters;
@@ -1751,13 +1715,9 @@ const Dashboard = () => {
       if (queryFilters.dateTo) params.append('dateTo', queryFilters.dateTo);
       if (queryFilters.period) params.append('period', queryFilters.period);
       
-      //console.log('Dashboard - Parâmetros de busca:', params.toString());
-      
       // 1. Buscar estatísticas principais primeiro (mais rápido)
-      //console.log('Dashboard - Buscando estatísticas principais...');
       const statsResponse = await api.get(`/dashboard/stats?${params.toString()}`);
       const statsData = statsResponse.data;
-      //console.log('Dashboard - Estatísticas recebidas:', statsData);
       
       setStats({
         totalClients: statsData.stats.totalClients || 0,
@@ -1775,24 +1735,14 @@ const Dashboard = () => {
       });
 
       // Atividades recentes (já vem do stats)
-      //console.log('Dashboard - Raw activities data:', JSON.stringify(statsData.activities, null, 2));
       setRecentActivities(statsData.activities || []);
-      
-      // Debug das atividades processadas
-      if (statsData.activities && statsData.activities.length > 0) {
-        //console.log('Dashboard - Primeira atividade:', statsData.activities[0]);
-        //console.log('Dashboard - Campos disponíveis:', Object.keys(statsData.activities[0]));
-      }
 
       // Dashboard básico está carregado, pode mostrar o conteúdo
       setLoading(false);
-      //console.log('Dashboard - Loading definido como false, iniciando carregamento de gráficos');
 
       // 2. Carregamento em paralelo dos dados mais pesados com timeout individual
       setChartsLoading(true);
-      //console.log('Dashboard - ChartsLoading definido como true');
       
-      //console.log('Dashboard - Iniciando Promise.allSettled para gráficos...');
       const [chartData, servicesData, clientRanking] = await Promise.allSettled([
         // Gráfico mensal com timeout estendido
         api.get('/dashboard/chart-data', {
@@ -1811,31 +1761,10 @@ const Dashboard = () => {
         })
       ]);
 
-      //console.log('Dashboard - Promise.allSettled concluído');
-      //console.log('Dashboard - Chart Data Status:', chartData.status);
-      //console.log('Dashboard - Services Data Status:', servicesData.status);
-      //console.log('Dashboard - Client Ranking Status:', clientRanking.status);
-
       // Processar resultados com fallback
       const chartResult = chartData.status === 'fulfilled' ? chartData.value.data : [];
       const servicesResult = servicesData.status === 'fulfilled' ? servicesData.value.data : [];
       const rankingResult = clientRanking.status === 'fulfilled' ? clientRanking.value.data : [];
-
-      // Log detalhado dos dados recebidos
-      //console.log('Dashboard - Chart Data Result:', chartResult);
-      //console.log('Dashboard - Services Data Result:', servicesResult);
-      //console.log('Dashboard - Client Ranking Result:', rankingResult);
-      //console.log('Dashboard - Client Ranking RAW RESPONSE:', JSON.stringify(rankingResult, null, 2));
-      
-      // Análise da estrutura dos dados de client ranking
-      if (Array.isArray(rankingResult) && rankingResult.length > 0) {
-        //console.log('Dashboard - Primeiro cliente estrutura:', {
-          //originalObject: rankingResult[0],
-          //keys: Object.keys(rankingResult[0]),
-          //attendancesField: rankingResult[0].attendances,
-          //attendanceCountField: rankingResult[0].attendanceCount
-        //});
-      }
 
       setPerformanceData({
         monthly: Array.isArray(chartResult) ? chartResult : [],
@@ -1844,12 +1773,6 @@ const Dashboard = () => {
 
       setClientRanking(Array.isArray(rankingResult) ? rankingResult : []);
       setChartsLoading(false);
-      
-      //console.log('Dashboard - ChartsLoading definido como false');
-      //console.log('Dashboard - PerformanceData atualizado:', {
-        //monthly: Array.isArray(chartResult) ? chartResult : [],
-        //services: Array.isArray(servicesResult) ? servicesResult : []
-      //});
 
       // Log de erros específicos sem quebrar o dashboard
       if (chartData.status === 'rejected') {
@@ -1867,38 +1790,6 @@ const Dashboard = () => {
 
       // Gerar insights dinâmicos baseados nos dados
       const dynamicInsights = [];
-      
-      // Insight do cliente VIP (baseado no ranking)
-      //if (statsData.clientRanking && statsData.clientRanking.length > 0) {
-      //  const vipClient = statsData.clientRanking[0];
-      //  dynamicInsights.push({
-      //    title: 'Cliente VIP do Período',
-      //    value: vipClient.name,
-      //    description: `${vipClient.attendanceCount} atendimentos`,
-      //    trend: { 
-      //      type: 'positive', 
-      //      text: `${statsData.stats.changes.clients.value}% novos clientes`,
-      //      icon: ArrowTrendingUpIcon 
-      //    },
-      //    icon: TrophyIcon,
-      //    color: 'yellow',
-      //    action: { label: 'Ver Perfil', onClick: () => navigate('/clients') }
-      //  });
-      //}
-
-      // Insight da taxa de retenção
-      //dynamicInsights.push({
-      //  title: 'Taxa de Retenção',
-      //  value: `${statsData.stats.retentionRate}%`,
-      //  description: 'clientes que retornaram',
-      //  trend: { 
-      //    type: 'info', 
-      //    text: `${statsData.stats.changes.attendances.value}% atendimentos`
-      //  },
-      //  icon: ClockIcon,
-      //  color: 'blue',
-  //  action de relatórios removida
-      //});
 
       setInsights(dynamicInsights);
 
@@ -1956,7 +1847,6 @@ const Dashboard = () => {
 
   // Função para buscar todas as atividades com filtros
   const loadAllActivities = async (customFilters = null) => {
-    //console.log('Dashboard - loadAllActivities iniciado', { customFilters, activityFilters });
     try {
       setActivitiesLoading(true);
       
@@ -1970,11 +1860,8 @@ const Dashboard = () => {
       if (queryFilters.limit) params.append('limit', queryFilters.limit);
       if (queryFilters.offset) params.append('offset', queryFilters.offset);
       
-      //console.log('Dashboard - Parâmetros de busca de atividades:', params.toString());
-      
       const response = await api.get(`/dashboard/activities?${params.toString()}`);
       const activitiesData = response.data;
-      //console.log('Dashboard - Atividades recebidas:', activitiesData);
       
       // Se offset > 0, significa que estamos carregando mais, então fazemos append
       if (queryFilters.offset > 0) {
