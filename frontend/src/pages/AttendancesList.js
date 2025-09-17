@@ -537,9 +537,9 @@ const AttendancesList = () => {
         ...filters
       };
 
-      console.log('Parâmetros enviados para API:', params);
+      //console.log('Parâmetros enviados para API:', params);
       const response = await attendanceService.list(params);
-      console.log('Resposta da API:', response);
+      //console.log('Resposta da API:', response);
       // Backend retorna { attendances, pagination }
       setAttendances(response.attendances || []);
       setPagination(prev => ({

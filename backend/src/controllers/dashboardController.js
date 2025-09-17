@@ -1,36 +1,231 @@
 const { getPrismaClient } = require('../config/database');
 
 const dashboardController = {
-  // Obter estatísticas do dashboard (versão otimizada)
+  // Obter estatísticas do dashboard (versão otimizada com filtros)
   async getStats(req, res) {
     try {
       const prisma = getPrismaClient();
+      const { dateFrom, dateTo, period } = req.query;
 
-      // Queries básicas e rápidas
+      // Construir filtros de data baseados nos parâmetros
+      let dateFilter = {};
+      let todayFilter = {};
+      
+      if (dateFrom && dateTo) {
+        // Usar datas específicas
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999); // Incluir todo o dia final
+        
+        dateFilter = {
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        };
+      } else if (period) {
+        // Usar período predefinido
+        const now = new Date();
+        let startOfPeriod;
+        
+        switch (period) {
+          case 'today':
+            startOfPeriod = new Date(now.setHours(0, 0, 0, 0));
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+          case '7':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 7);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+          case '30':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+          case '90':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 90);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+          case 'year':
+            startOfPeriod = new Date(now.getFullYear(), 0, 1);
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+          default:
+            // Sem filtro específico - usar últimos 30 dias como padrão
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            dateFilter = {
+              createdAt: {
+                gte: startOfPeriod
+              }
+            };
+            break;
+        }
+      } else {
+        // Sem filtros - usar últimos 30 dias como padrão
+        const now = new Date();
+        const startOfPeriod = new Date(now);
+        startOfPeriod.setDate(now.getDate() - 30);
+        startOfPeriod.setHours(0, 0, 0, 0);
+        dateFilter = {
+          createdAt: {
+            gte: startOfPeriod
+          }
+        };
+      }
+
+      // Filtro específico para "hoje" (sempre usar o dia atual)
+      todayFilter = {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0))
+        }
+      };
+
+      // Aplicar filtros nas queries
       const [
         totalClients,
         totalAttendances,
         totalForms,
         todayAttendances
       ] = await Promise.all([
-        prisma.client.count({ where: { isActive: true } }),
-        prisma.attendance.count(),
-        prisma.attendanceForm.count({ where: { isActive: true } }),
-        prisma.attendance.count({
-          where: {
-            createdAt: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0))
-            }
+        // Total de clientes no período (apenas ativos)
+        prisma.client.count({ 
+          where: { 
+            isActive: true,
+            ...dateFilter
           }
+        }),
+        // Total de atendimentos no período
+        prisma.attendance.count({
+          where: dateFilter
+        }),
+        // Total de formulários no período
+        prisma.attendanceForm.count({ 
+          where: { 
+            isActive: true,
+            ...dateFilter
+          }
+        }),
+        // Atendimentos hoje (sempre usar filtro de hoje)
+        prisma.attendance.count({
+          where: todayFilter
         })
       ]);
 
-      // Atividades recentes (múltiplos tipos)
+      // Calcular taxa de retenção para o período
+      let retentionRate = 0;
+      try {
+        // Para calcular retenção, precisamos de dois períodos:
+        // 1. Período anterior (para identificar clientes base)
+        // 2. Período atual (para ver quem retornou)
+        
+        // Extrair datas do dateFilter atual para calcular período anterior
+        let currentPeriodStart, currentPeriodEnd;
+        
+        if (dateFrom && dateTo) {
+          // Usar datas específicas fornecidas
+          currentPeriodStart = new Date(dateFrom);
+          currentPeriodEnd = new Date(dateTo);
+        } else {
+          // Calcular baseado no dateFilter já construído
+          if (dateFilter.createdAt && dateFilter.createdAt.gte) {
+            currentPeriodStart = new Date(dateFilter.createdAt.gte);
+            currentPeriodEnd = dateFilter.createdAt.lte ? new Date(dateFilter.createdAt.lte) : new Date();
+          } else {
+            // Fallback para últimos 30 dias
+            currentPeriodEnd = new Date();
+            currentPeriodStart = new Date();
+            currentPeriodStart.setDate(currentPeriodStart.getDate() - 30);
+          }
+        }
+        
+        // Calcular datas do período anterior (mesmo tamanho do período atual)
+        const periodDurationMs = currentPeriodEnd - currentPeriodStart;
+        const previousPeriodEnd = new Date(currentPeriodStart.getTime() - 1); // 1ms antes do período atual
+        const previousPeriodStart = new Date(previousPeriodEnd.getTime() - periodDurationMs);
+
+        // Filtros para os dois períodos (usar createdAt em vez de attendanceDate)
+        const currentPeriodFilter = {
+          createdAt: {
+            gte: currentPeriodStart,
+            lte: currentPeriodEnd
+          }
+        };
+
+        const previousPeriodFilter = {
+          createdAt: {
+            gte: previousPeriodStart,
+            lte: previousPeriodEnd
+          }
+        };
+
+        // Clientes que tiveram atendimentos no período anterior
+        const clientsWithPreviousAttendances = await prisma.client.findMany({
+          where: {
+            isActive: true,
+            attendances: {
+              some: previousPeriodFilter
+            }
+          },
+          select: { id: true }
+        });
+
+        if (clientsWithPreviousAttendances.length > 0) {
+          // Dos clientes do período anterior, quantos voltaram no período atual?
+          const clientsWhoReturned = await prisma.client.count({
+            where: {
+              id: {
+                in: clientsWithPreviousAttendances.map(c => c.id)
+              },
+              isActive: true,
+              attendances: {
+                some: currentPeriodFilter
+              }
+            }
+          });
+
+          retentionRate = Math.round((clientsWhoReturned / clientsWithPreviousAttendances.length) * 100);
+        }
+      } catch (error) {
+        console.warn('Erro ao calcular taxa de retenção:', error);
+        retentionRate = 0;
+      }
+
+      // Atividades recentes (aplicar filtro de data)
+
+      // Atividades recentes (aplicar filtro de data)
       const [recentAttendances, recentClients, recentUsers, recentForms] = await Promise.all([
-        // Atendimentos recentes
+        // Atendimentos recentes no período
         prisma.attendance.findMany({
           take: 3,
           orderBy: { createdAt: 'desc' },
+          where: dateFilter,
           include: {
             client: {
               select: { firstName: true, lastName: true }
@@ -40,22 +235,31 @@ const dashboardController = {
             }
           }
         }),
-        // Clientes recentes
+        // Clientes recentes no período
         prisma.client.findMany({
           take: 2,
           orderBy: { createdAt: 'desc' },
+          where: {
+            isActive: true,
+            ...dateFilter
+          },
           select: { id: true, firstName: true, lastName: true, createdAt: true, updatedAt: true }
         }),
-        // Usuários recentes
+        // Usuários recentes no período
         prisma.user.findMany({
           take: 1,
           orderBy: { createdAt: 'desc' },
+          where: dateFilter,
           select: { id: true, name: true, createdAt: true, updatedAt: true }
         }),
-        // Formulários recentes
+        // Formulários recentes no período
         prisma.attendanceForm.findMany({
           take: 1,
           orderBy: { createdAt: 'desc' },
+          where: {
+            isActive: true,
+            ...dateFilter
+          },
           select: { id: true, name: true, createdAt: true, updatedAt: true }
         })
       ]);
@@ -174,55 +378,179 @@ const dashboardController = {
       activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       const limitedActivities = activities.slice(0, 5);
 
-      // Calcular mudanças baseadas em dados reais
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
+      // Calcular mudanças baseadas no período anterior equivalente
+      let previousPeriodFilter = {};
+      let periodDescription = '';
       
-      const lastWeek = new Date();
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      
+      if (dateFrom && dateTo) {
+        // Para datas específicas, comparar com período anterior de mesmo tamanho
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        const periodDuration = endDate.getTime() - startDate.getTime();
+        const previousEndDate = new Date(startDate.getTime() - 1);
+        const previousStartDate = new Date(previousEndDate.getTime() - periodDuration);
+        
+        previousPeriodFilter = {
+          createdAt: {
+            gte: previousStartDate,
+            lte: previousEndDate
+          }
+        };
+        periodDescription = `${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`;
+      } else if (period) {
+        // Para períodos predefinidos, usar período anterior equivalente
+        const now = new Date();
+        let daysBack = 30; // padrão
+        
+        switch (period) {
+          case 'today':
+            daysBack = 1;
+            // Comparar com ontem
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+            const endYesterday = new Date(yesterday);
+            endYesterday.setHours(23, 59, 59, 999);
+            
+            previousPeriodFilter = {
+              createdAt: {
+                gte: yesterday,
+                lte: endYesterday
+              }
+            };
+            periodDescription = 'Hoje';
+            break;
+          case '7':
+            daysBack = 7;
+            // Comparar com os 7 dias anteriores
+            const startPrev7 = new Date(now);
+            startPrev7.setDate(now.getDate() - 14);
+            startPrev7.setHours(0, 0, 0, 0);
+            const endPrev7 = new Date(now);
+            endPrev7.setDate(now.getDate() - 7);
+            endPrev7.setHours(23, 59, 59, 999);
+            
+            previousPeriodFilter = {
+              createdAt: {
+                gte: startPrev7,
+                lte: endPrev7
+              }
+            };
+            periodDescription = 'Últimos 7 dias';
+            break;
+          case '30':
+            daysBack = 30;
+            // Comparar com os 30 dias anteriores
+            const startPrev30 = new Date(now);
+            startPrev30.setDate(now.getDate() - 60);
+            startPrev30.setHours(0, 0, 0, 0);
+            const endPrev30 = new Date(now);
+            endPrev30.setDate(now.getDate() - 30);
+            endPrev30.setHours(23, 59, 59, 999);
+            
+            previousPeriodFilter = {
+              createdAt: {
+                gte: startPrev30,
+                lte: endPrev30
+              }
+            };
+            periodDescription = 'Últimos 30 dias';
+            break;
+          case '90':
+            daysBack = 90;
+            // Comparar com os 90 dias anteriores
+            const startPrev90 = new Date(now);
+            startPrev90.setDate(now.getDate() - 180);
+            startPrev90.setHours(0, 0, 0, 0);
+            const endPrev90 = new Date(now);
+            endPrev90.setDate(now.getDate() - 90);
+            endPrev90.setHours(23, 59, 59, 999);
+            
+            previousPeriodFilter = {
+              createdAt: {
+                gte: startPrev90,
+                lte: endPrev90
+              }
+            };
+            periodDescription = 'Últimos 90 dias';
+            break;
+          case 'year':
+            // Comparar com o ano anterior
+            const currentYear = now.getFullYear();
+            const prevYearStart = new Date(currentYear - 1, 0, 1);
+            const prevYearEnd = new Date(currentYear - 1, 11, 31, 23, 59, 59, 999);
+            
+            previousPeriodFilter = {
+              createdAt: {
+                gte: prevYearStart,
+                lte: prevYearEnd
+              }
+            };
+            periodDescription = 'Este ano';
+            break;
+        }
+      }
+
+      // Buscar dados do período anterior para comparação
       const [
-        yesterdayAttendances,
-        lastWeekAttendances,
-        lastWeekClients
+        prevTotalClients,
+        prevTotalAttendances,
+        prevTotalForms,
+        yesterdayAttendances
       ] = await Promise.all([
-        prisma.attendance.count({
-          where: {
-            createdAt: {
-              gte: yesterday,
-              lt: new Date(yesterday.getTime() + 24 * 60 * 60 * 1000)
-            }
+        prisma.client.count({ 
+          where: { 
+            isActive: true,
+            ...previousPeriodFilter
           }
         }),
         prisma.attendance.count({
-          where: {
-            createdAt: {
-              gte: lastWeek,
-              lt: new Date(lastWeek.getTime() + 24 * 60 * 60 * 1000)
-            }
+          where: previousPeriodFilter
+        }),
+        prisma.attendanceForm.count({ 
+          where: { 
+            isActive: true,
+            ...previousPeriodFilter
           }
         }),
-        prisma.client.count({
+        // Atendimentos de ontem para comparar com hoje
+        prisma.attendance.count({
           where: {
             createdAt: {
-              gte: lastWeek
+              gte: (() => {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                return yesterday;
+              })(),
+              lt: (() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return today;
+              })()
             }
           }
         })
       ]);
 
-      // Calcular tendências
-      const attendanceChange = todayAttendances - yesterdayAttendances;
-      const clientChange = lastWeekClients;
+      // Calcular mudanças percentuais
+      const calculateChange = (current, previous) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - previous) / previous) * 100);
+      };
+
+      const clientChange = calculateChange(totalClients, prevTotalClients);
+      const attendanceChange = calculateChange(totalAttendances, prevTotalAttendances);
+      const formChange = calculateChange(totalForms, prevTotalForms);
+      const todayAttendancesChange = calculateChange(todayAttendances, yesterdayAttendances);
       
-      // Stats com dados reais
+      // Stats com dados reais filtrados
       const stats = {
         totalClients,
         totalAttendances,
         totalForms,
         todayAttendances,
-        retentionRate: totalClients > 0 ? Math.min(95, Math.round((totalAttendances / totalClients) * 10)) : 0,
+        retentionRate,
         changes: {
           clients: { 
             value: Math.abs(clientChange), 
@@ -232,20 +560,29 @@ const dashboardController = {
             value: Math.abs(attendanceChange), 
             trend: attendanceChange > 0 ? 'up' : attendanceChange < 0 ? 'down' : 'neutral' 
           },
-          forms: { value: 0, trend: 'neutral' },
+          forms: { 
+            value: Math.abs(formChange), 
+            trend: formChange > 0 ? 'up' : formChange < 0 ? 'down' : 'neutral' 
+          },
           todayAttendances: { 
-            value: todayAttendances, 
-            trend: todayAttendances > 0 ? 'up' : 'neutral' 
+            value: Math.abs(todayAttendancesChange), 
+            trend: todayAttendancesChange > 0 ? 'up' : todayAttendancesChange < 0 ? 'down' : 'neutral' 
+          },
+          retentionRate: { 
+            value: retentionRate, 
+            trend: retentionRate > 70 ? 'up' : retentionRate > 50 ? 'neutral' : 'down' 
           }
         }
       };
 
       res.json({
         stats,
-        activities: limitedActivities, // Atividades já limitadas e ordenadas
+        activities: limitedActivities,
         period: {
-          start: new Date(new Date().getTime() - (30 * 24 * 60 * 60 * 1000)).toISOString(),
-          end: new Date().toISOString()
+          description: periodDescription,
+          dateFrom: dateFrom || null,
+          dateTo: dateTo || null,
+          periodFilter: period || '30'
         }
       });
 
@@ -262,77 +599,248 @@ const dashboardController = {
   async getChartData(req, res) {
     try {
       const prisma = getPrismaClient();
+      const { dateFrom, dateTo, period } = req.query;
       
-      // Cache simples para evitar recálculo frequente
-      const cacheKey = 'dashboard_chart_data';
-      const cachedData = global.dashboardCache?.[cacheKey];
-      const cacheTime = global.dashboardCacheTime?.[cacheKey];
+      // Construir filtros de data baseados nos parâmetros
+      let dateFilter = {};
+      let chartPeriods = [];
       
-      // Se tem cache válido (menos de 5 minutos), usar cache
-      if (cachedData && cacheTime && (Date.now() - cacheTime) < 300000) {
-        return res.json(cachedData);
-      }
-      
-      // Buscar dados reais dos últimos 6 meses com query otimizada
-      const last6Months = [];
-      const now = new Date();
-      
-      // Query única para todos os meses
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const attendances = await prisma.attendance.findMany({
-        where: {
+      if (dateFrom && dateTo) {
+        // Datas específicas - dividir em meses/períodos dentro do range
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        
+        const diffTime = Math.abs(endDate - startDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        dateFilter = {
           createdAt: {
-            gte: sixMonthsAgo
+            gte: startDate,
+            lte: endDate
           }
-        },
+        };
+        
+        // Se o período for maior que 90 dias, dividir por meses
+        // Se for menor, dividir por semanas ou dias
+        if (diffDays > 90) {
+          // Dividir por meses
+          let currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+            
+            // Ajustar para não ultrapassar o período selecionado
+            if (monthStart < startDate) monthStart.setTime(startDate.getTime());
+            if (monthEnd > endDate) monthEnd.setTime(endDate.getTime());
+            
+            chartPeriods.push({
+              start: new Date(monthStart),
+              end: new Date(monthEnd),
+              label: monthStart.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+            });
+            
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        } else if (diffDays > 14) {
+          // Dividir por semanas
+          let currentDate = new Date(startDate);
+          let weekCount = 1;
+          
+          while (currentDate <= endDate) {
+            const weekEnd = new Date(currentDate);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+            
+            chartPeriods.push({
+              start: new Date(currentDate),
+              end: new Date(weekEnd),
+              label: `Sem ${weekCount}`
+            });
+            
+            currentDate.setDate(currentDate.getDate() + 7);
+            weekCount++;
+          }
+        } else {
+          // Dividir por dias
+          let currentDate = new Date(startDate);
+          
+          while (currentDate <= endDate) {
+            const dayEnd = new Date(currentDate);
+            dayEnd.setHours(23, 59, 59, 999);
+            
+            chartPeriods.push({
+              start: new Date(currentDate),
+              end: new Date(dayEnd),
+              label: currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            });
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        }
+      } else if (period) {
+        // Período predefinido
+        const now = new Date();
+        let periodsToShow = [];
+        
+        switch (period) {
+          case 'today':
+            // Mostrar as últimas 24 horas divididas por hora
+            for (let i = 23; i >= 0; i--) {
+              const hourStart = new Date(now);
+              hourStart.setHours(now.getHours() - i, 0, 0, 0);
+              const hourEnd = new Date(hourStart);
+              hourEnd.setMinutes(59, 59, 999);
+              
+              chartPeriods.push({
+                start: hourStart,
+                end: hourEnd,
+                label: hourStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              });
+            }
+            break;
+          case '7':
+            // Últimos 7 dias
+            for (let i = 6; i >= 0; i--) {
+              const dayStart = new Date(now);
+              dayStart.setDate(now.getDate() - i);
+              dayStart.setHours(0, 0, 0, 0);
+              const dayEnd = new Date(dayStart);
+              dayEnd.setHours(23, 59, 59, 999);
+              
+              chartPeriods.push({
+                start: dayStart,
+                end: dayEnd,
+                label: dayStart.toLocaleDateString('pt-BR', { weekday: 'short' })
+              });
+            }
+            break;
+          case '30':
+            // Últimos 30 dias divididos por semanas
+            for (let i = 4; i >= 0; i--) {
+              const weekStart = new Date(now);
+              weekStart.setDate(now.getDate() - (i * 7) - 6);
+              weekStart.setHours(0, 0, 0, 0);
+              const weekEnd = new Date(now);
+              weekEnd.setDate(now.getDate() - (i * 7));
+              weekEnd.setHours(23, 59, 59, 999);
+              
+              chartPeriods.push({
+                start: weekStart,
+                end: weekEnd,
+                label: `Sem ${5-i}`
+              });
+            }
+            break;
+          case '90':
+            // Últimos 90 dias divididos por meses
+            for (let i = 2; i >= 0; i--) {
+              const monthStart = new Date(now);
+              monthStart.setMonth(now.getMonth() - i, 1);
+              monthStart.setHours(0, 0, 0, 0);
+              const monthEnd = new Date(now);
+              monthEnd.setMonth(now.getMonth() - i + 1, 0);
+              monthEnd.setHours(23, 59, 59, 999);
+              
+              chartPeriods.push({
+                start: monthStart,
+                end: monthEnd,
+                label: monthStart.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+              });
+            }
+            break;
+          case 'year':
+            // Este ano dividido por meses
+            const currentYear = now.getFullYear();
+            for (let month = 0; month <= now.getMonth(); month++) {
+              const monthStart = new Date(currentYear, month, 1);
+              const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
+              
+              chartPeriods.push({
+                start: monthStart,
+                end: monthEnd,
+                label: monthStart.toLocaleDateString('pt-BR', { month: 'short' })
+              });
+            }
+            break;
+          default:
+            // Padrão: últimos 6 meses
+            for (let i = 5; i >= 0; i--) {
+              const monthStart = new Date(now);
+              monthStart.setMonth(now.getMonth() - i, 1);
+              monthStart.setHours(0, 0, 0, 0);
+              const monthEnd = new Date(now);
+              monthEnd.setMonth(now.getMonth() - i + 1, 0);
+              monthEnd.setHours(23, 59, 59, 999);
+              
+              chartPeriods.push({
+                start: monthStart,
+                end: monthEnd,
+                label: monthStart.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+              });
+            }
+        }
+        
+        // Definir filtro geral para busca dos dados
+        const oldestPeriod = chartPeriods[0];
+        dateFilter = {
+          createdAt: {
+            gte: oldestPeriod.start
+          }
+        };
+      } else {
+        // Sem filtros específicos - usar últimos 6 meses como padrão
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const monthStart = new Date(now);
+          monthStart.setMonth(now.getMonth() - i, 1);
+          monthStart.setHours(0, 0, 0, 0);
+          const monthEnd = new Date(now);
+          monthEnd.setMonth(now.getMonth() - i + 1, 0);
+          monthEnd.setHours(23, 59, 59, 999);
+          
+          chartPeriods.push({
+            start: monthStart,
+            end: monthEnd,
+            label: monthStart.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+          });
+        }
+        
+        const oldestPeriod = chartPeriods[0];
+        dateFilter = {
+          createdAt: {
+            gte: oldestPeriod.start
+          }
+        };
+      }
+
+      // Buscar dados com filtro aplicado
+      const attendances = await prisma.attendance.findMany({
+        where: dateFilter,
         select: {
           createdAt: true,
           clientId: true
         }
       });
-      
-      // Processar dados por mês
-      for (let i = 5; i >= 0; i--) {
-        const startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - i);
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(0);
-        endDate.setHours(23, 59, 59, 999);
-        
-        const monthName = startDate.toLocaleDateString('pt-BR', { 
-          month: 'short', 
-          year: '2-digit' 
-        });
-        
-        // Filtrar atendimentos do mês
-        const monthAttendances = attendances.filter(att => 
-          att.createdAt >= startDate && att.createdAt <= endDate
+
+      // Processar dados por período
+      const chartData = chartPeriods.map(period => {
+        const periodAttendances = attendances.filter(att => 
+          att.createdAt >= period.start && att.createdAt <= period.end
         );
         
-        // Contar clientes únicos
-        const uniqueClients = new Set(monthAttendances.map(att => att.clientId));
+        const uniqueClients = new Set(periodAttendances.map(att => att.clientId));
         
-        last6Months.push({
-          month: monthName,
-          attendances: monthAttendances.length,
+        return {
+          month: period.label,
+          attendances: periodAttendances.length,
           clients: uniqueClients.size
-        });
-      }
+        };
+      });
 
-      // Armazenar no cache
-      if (!global.dashboardCache) global.dashboardCache = {};
-      if (!global.dashboardCacheTime) global.dashboardCacheTime = {};
-      
-      global.dashboardCache[cacheKey] = last6Months;
-      global.dashboardCacheTime[cacheKey] = Date.now();
-
-      res.json(last6Months);
+      res.json(chartData);
 
     } catch (error) {
       console.error('Erro ao buscar dados do gráfico:', error);
@@ -361,16 +869,20 @@ const dashboardController = {
   async getClientRanking(req, res) {
     try {
       const prisma = getPrismaClient();
-      const { startDate, endDate, period } = req.query;
+      const { dateFrom, dateTo, period } = req.query;
 
       // Construir filtros de data para os atendimentos
       let dateFilter = {};
       
-      if (startDate && endDate) {
+      if (dateFrom && dateTo) {
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        
         dateFilter = {
           createdAt: {
-            gte: new Date(startDate),
-            lte: new Date(endDate)
+            gte: startDate,
+            lte: endDate
           }
         };
       } else if (period) {
@@ -381,20 +893,29 @@ const dashboardController = {
           case 'today':
             startOfPeriod = new Date(now.setHours(0, 0, 0, 0));
             break;
-          case 'week':
-            const startOfWeek = new Date(now);
-            startOfWeek.setDate(now.getDate() - now.getDay());
-            startOfWeek.setHours(0, 0, 0, 0);
-            startOfPeriod = startOfWeek;
+          case '7':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 7);
+            startOfPeriod.setHours(0, 0, 0, 0);
             break;
-          case 'month':
-            startOfPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+          case '30':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            break;
+          case '90':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 90);
+            startOfPeriod.setHours(0, 0, 0, 0);
             break;
           case 'year':
             startOfPeriod = new Date(now.getFullYear(), 0, 1);
             break;
           default:
-            // Sem filtro de período
+            // Padrão: últimos 30 dias
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
             break;
         }
         
@@ -405,6 +926,18 @@ const dashboardController = {
             }
           };
         }
+      } else {
+        // Sem filtros - usar últimos 30 dias como padrão
+        const now = new Date();
+        const startOfPeriod = new Date(now);
+        startOfPeriod.setDate(now.getDate() - 30);
+        startOfPeriod.setHours(0, 0, 0, 0);
+        
+        dateFilter = {
+          createdAt: {
+            gte: startOfPeriod
+          }
+        };
       }
 
       // Buscar clientes com contagem de atendimentos filtrados
@@ -440,14 +973,6 @@ const dashboardController = {
         position: index + 1
       }));
 
-      console.log('Dashboard - Client Ranking Backend:', {
-        filtros: { startDate, endDate, period },
-        dateFilter,
-        totalClients: clients.length,
-        clientsWithAttendances: clientsWithAttendances.length,
-        ranking
-      });
-
       res.json(ranking);
 
     } catch (error) {
@@ -459,47 +984,105 @@ const dashboardController = {
     }
   },
 
-  // Distribuição de serviços otimizada
+  // Distribuição de serviços otimizada com filtros
   async getServicesDistribution(req, res) {
     try {
       const prisma = getPrismaClient();
+      const { dateFrom, dateTo, period } = req.query;
       
-      // Cache para evitar recálculos
-      const cacheKey = 'dashboard_services_data';
-      const cachedData = global.dashboardCache?.[cacheKey];
-      const cacheTime = global.dashboardCacheTime?.[cacheKey];
+      // Construir filtros de data
+      let dateFilter = {};
       
-      // Se tem cache válido (menos de 10 minutos), usar cache
-      if (cachedData && cacheTime && (Date.now() - cacheTime) < 600000) {
-        return res.json(cachedData);
+      if (dateFrom && dateTo) {
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        
+        dateFilter = {
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        };
+      } else if (period) {
+        const now = new Date();
+        let startOfPeriod;
+        
+        switch (period) {
+          case 'today':
+            startOfPeriod = new Date(now.setHours(0, 0, 0, 0));
+            break;
+          case '7':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 7);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            break;
+          case '30':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            break;
+          case '90':
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 90);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            break;
+          case 'year':
+            startOfPeriod = new Date(now.getFullYear(), 0, 1);
+            break;
+          default:
+            // Padrão: últimos 30 dias
+            startOfPeriod = new Date(now);
+            startOfPeriod.setDate(now.getDate() - 30);
+            startOfPeriod.setHours(0, 0, 0, 0);
+            break;
+        }
+        
+        if (startOfPeriod) {
+          dateFilter = {
+            createdAt: {
+              gte: startOfPeriod
+            }
+          };
+        }
+      } else {
+        // Sem filtros - usar últimos 30 dias como padrão
+        const now = new Date();
+        const startOfPeriod = new Date(now);
+        startOfPeriod.setDate(now.getDate() - 30);
+        startOfPeriod.setHours(0, 0, 0, 0);
+        
+        dateFilter = {
+          createdAt: {
+            gte: startOfPeriod
+          }
+        };
       }
-      
-      // Query otimizada com agregação
-      const attendanceForms = await prisma.attendanceForm.findMany({
-        where: { isActive: true },
+
+      // Buscar atendimentos no período especificado agrupados por formulário
+      const attendances = await prisma.attendance.findMany({
+        where: dateFilter,
         select: {
-          name: true,
-          _count: {
-            select: { attendances: true }
+          attendanceForm: {
+            select: {
+              name: true
+            }
           }
         }
       });
       
-      let totalAttendances = 0;
+      // Processar dados para distribuição
       const servicesMap = new Map();
+      let totalAttendances = attendances.length;
       
-      // Processar dados
-      attendanceForms.forEach(form => {
-        const serviceName = form.name || 'Serviço Geral';
-        const count = form._count.attendances;
+      attendances.forEach(attendance => {
+        const serviceName = attendance.attendanceForm?.name || 'Serviço Geral';
         
         if (servicesMap.has(serviceName)) {
-          servicesMap.set(serviceName, servicesMap.get(serviceName) + count);
+          servicesMap.set(serviceName, servicesMap.get(serviceName) + 1);
         } else {
-          servicesMap.set(serviceName, count);
+          servicesMap.set(serviceName, 1);
         }
-        
-        totalAttendances += count;
       });
       
       // Converter para array e calcular percentuais
@@ -512,28 +1095,13 @@ const dashboardController = {
         .sort((a, b) => b.count - a.count)
         .slice(0, 6); // Top 6 serviços
       
-      // Fallback se não houver dados
+      // Fallback se não houver dados no período
       if (servicesData.length === 0) {
         const defaultServices = [
-          { name: 'Aguardando Dados', count: 0, value: 100 }
+          { name: 'Nenhum atendimento no período', count: 0, value: 100 }
         ];
-        
-        // Cache do fallback também
-        if (!global.dashboardCache) global.dashboardCache = {};
-        if (!global.dashboardCacheTime) global.dashboardCacheTime = {};
-        
-        global.dashboardCache[cacheKey] = defaultServices;
-        global.dashboardCacheTime[cacheKey] = Date.now();
-        
         return res.json(defaultServices);
       }
-
-      // Armazenar no cache
-      if (!global.dashboardCache) global.dashboardCache = {};
-      if (!global.dashboardCacheTime) global.dashboardCacheTime = {};
-      
-      global.dashboardCache[cacheKey] = servicesData;
-      global.dashboardCacheTime[cacheKey] = Date.now();
 
       res.json(servicesData);
 

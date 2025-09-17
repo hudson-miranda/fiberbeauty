@@ -22,7 +22,7 @@ const attendanceController = {
         attendantName = ''
       } = req.query;
 
-      console.log('Parâmetros recebidos na API:', req.query);
+      //console.log('Parâmetros recebidos na API:', req.query);
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const take = parseInt(limit);
@@ -121,7 +121,7 @@ const attendanceController = {
         where.userId = req.user.id;
       }
 
-      console.log('Query WHERE construída:', JSON.stringify(where, null, 2));
+      //console.log('Query WHERE construída:', JSON.stringify(where, null, 2));
 
       const [attendances, total] = await Promise.all([
         prisma.attendance.findMany({
@@ -236,15 +236,15 @@ const attendanceController = {
       const { clientId, attendanceFormId, responses, signature, notes } = req.body;
       const userId = req.user.id;
 
-      console.log('Dados recebidos para criar atendimento:', {
-        clientId,
-        attendanceFormId,
-        userId,
-        responses: JSON.stringify(responses),
-        signature: signature ? 'presente' : 'ausente',
-        notes,
-        requestBody: JSON.stringify(req.body, null, 2)
-      });
+      //console.log('Dados recebidos para criar atendimento:', {
+      //  clientId,
+      //  attendanceFormId,
+      //  userId,
+      //  responses: JSON.stringify(responses),
+      //  signature: signature ? 'presente' : 'ausente',
+      //  notes,
+      //  requestBody: JSON.stringify(req.body, null, 2)
+      //});
 
       // Validar se IDs são strings válidas
       if (!clientId || typeof clientId !== 'string') {
@@ -256,7 +256,7 @@ const attendanceController = {
       }
 
       if (!attendanceFormId || typeof attendanceFormId !== 'string') {
-        console.log('AttendanceFormId inválido:', { attendanceFormId, type: typeof attendanceFormId });
+        //console.log('AttendanceFormId inválido:', { attendanceFormId, type: typeof attendanceFormId });
         return res.status(400).json({
           error: 'ID da ficha de atendimento é obrigatório e deve ser uma string válida',
           code: 'INVALID_FORM_ID',
@@ -269,7 +269,7 @@ const attendanceController = {
       });
 
       if (!client || !client.isActive) {
-        console.log('Cliente não encontrado:', clientId);
+        //console.log('Cliente não encontrado:', clientId);
         return res.status(404).json({
           error: 'Cliente não encontrado',
           code: 'CLIENT_NOT_FOUND',

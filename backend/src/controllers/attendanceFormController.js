@@ -289,11 +289,11 @@ const attendanceFormController = {
       const { id } = req.params;
       const { name } = req.body;
 
-      console.log('Tentativa de duplicação:', { id, name, userRole: req.user.role });
+      //console.log('Tentativa de duplicação:', { id, name, userRole: req.user.role });
 
       // Verificar permissões (apenas ADMIN)
       if (req.user.role !== 'ADMIN') {
-        console.log('Usuário sem permissão para duplicar:', req.user.username);
+        //console.log('Usuário sem permissão para duplicar:', req.user.username);
         return res.status(403).json({
           error: 'Apenas administradores podem duplicar fichas de atendimento',
           code: 'INSUFFICIENT_PERMISSIONS',

@@ -1041,7 +1041,7 @@ const DateFilter = ({ filters, onFiltersChange, onApply, onClear, loading }) => 
     
     // Aplicar automaticamente após um pequeno delay
     setTimeout(() => {
-      onApply();
+      onApply(newFilters); // Passar os filtros diretamente
       setIsOpen(false);
     }, 150);
   };
@@ -1057,7 +1057,7 @@ const DateFilter = ({ filters, onFiltersChange, onApply, onClear, loading }) => 
 
   const handleApplyCustom = () => {
     onFiltersChange(tempFilters);
-    onApply();
+    onApply(tempFilters); // Passar os filtros diretamente
     setIsOpen(false);
   };
 
@@ -1069,7 +1069,7 @@ const DateFilter = ({ filters, onFiltersChange, onApply, onClear, loading }) => 
     };
     setTempFilters(clearedFilters);
     onFiltersChange(clearedFilters);
-    onClear();
+    onClear(clearedFilters); // Passar os filtros diretamente
     setIsOpen(false);
   };
 
@@ -1870,19 +1870,20 @@ const Dashboard = () => {
     setFilters(newFilters);
   };
 
-  const handleApplyFilters = () => {
-    console.log('Aplicando filtros:', filters);
-    loadDashboardData(filters);
+  const handleApplyFilters = (filtersToApply = null) => {
+    const targetFilters = filtersToApply || filters;
+    //console.log('Aplicando filtros:', targetFilters);
+    loadDashboardData(targetFilters);
   };
 
-  const handleClearFilters = () => {
-    const defaultFilters = {
+  const handleClearFilters = (filtersToApply = null) => {
+    const targetFilters = filtersToApply || {
       dateFrom: '',
       dateTo: '',
       period: '30'
     };
-    setFilters(defaultFilters);
-    loadDashboardData(defaultFilters);
+    setFilters(targetFilters);
+    loadDashboardData(targetFilters);
   };
 
   if (loading) {
@@ -1920,9 +1921,6 @@ const Dashboard = () => {
                   transition={{ delay: 0.2 }}
                   className="flex items-center gap-4 mb-2"
                 >
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-gold-300" />
-                  </div>
                   <div>
                     <h1 className="text-[clamp(1.25rem,2vw,1.75rem)] font-bold leading-tight">
                       Bem-vindo de volta, {user?.name || 'Profissional'}! 👋

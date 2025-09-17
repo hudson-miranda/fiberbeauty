@@ -107,9 +107,9 @@ const AttendanceNew = () => {
         notes: data.notes || ''
       };
 
-      console.log('Dados do atendimento sendo enviados:', attendanceData);
-      console.log('Formulário selecionado:', selectedForm);
-      console.log('Cliente selecionado:', selectedClient);
+      //console.log('Dados do atendimento sendo enviados:', attendanceData);
+      //console.log('Formulário selecionado:', selectedForm);
+      //console.log('Cliente selecionado:', selectedClient);
 
       await attendanceService.create(attendanceData);
       toast.success('Atendimento criado com sucesso!');

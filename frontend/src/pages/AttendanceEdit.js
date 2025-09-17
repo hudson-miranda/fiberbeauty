@@ -75,15 +75,15 @@ const AttendanceEdit = () => {
   const watchFormId = watch('attendanceFormId');
 
   useEffect(() => {
-    console.log('ID capturado da URL:', id);
-    console.log('Token no localStorage:', localStorage.getItem('token'));
-    console.log('Usuário autenticado:', isAuthenticated);
-    console.log('Usuário:', user);
+    //console.log('ID capturado da URL:', id);
+    //console.log('Token no localStorage:', localStorage.getItem('token'));
+    //console.log('Usuário autenticado:', isAuthenticated);
+    //console.log('Usuário:', user);
     
     if (!authLoading && isAuthenticated) {
       fetchInitialData();
     } else if (!authLoading && !isAuthenticated) {
-      console.log('Usuário não autenticado, redirecionando...');
+      //console.log('Usuário não autenticado, redirecionando...');
       navigate('/login');
     }
   }, [id, authLoading, isAuthenticated]);
@@ -99,11 +99,11 @@ const AttendanceEdit = () => {
   // UseEffect para garantir que os dados sejam preenchidos após carregar
   useEffect(() => {
     if (attendance && forms.length > 0 && !loadingData && !dataInitialized && isAuthenticated) {
-      console.log('Preenchendo dados do formulário:', {
-        attendance,
-        forms: forms.length,
-        selectedForm: selectedForm?.id
-      });
+      //console.log('Preenchendo dados do formulário:', {
+      //  attendance,
+      //  forms: forms.length,
+      //  selectedForm: selectedForm?.id
+      //});
       
       // Preencher os valores usando setValue individualmente
       setValue('clientId', attendance.clientId);
@@ -111,19 +111,19 @@ const AttendanceEdit = () => {
       setValue('status', attendance.status);
       setValue('notes', attendance.notes || '');
       
-      console.log('Valores definidos:', {
-        clientId: attendance.clientId,
-        attendanceFormId: attendance.attendanceFormId,
-        status: attendance.status,
-        notes: attendance.notes,
-        responses: attendance.responses
-      });
+      //console.log('Valores definidos:', {
+      //  clientId: attendance.clientId,
+      //  attendanceFormId: attendance.attendanceFormId,
+      //  status: attendance.status,
+      //  notes: attendance.notes,
+      //  responses: attendance.responses
+      //});
       
-      console.log('Valores do watch após setValue:', {
-        status: watch('status'),
-        attendanceFormId: watch('attendanceFormId'),
-        clientId: watch('clientId')
-      });
+      //console.log('Valores do watch após setValue:', {
+      //  status: watch('status'),
+      //  attendanceFormId: watch('attendanceFormId'),
+      //  clientId: watch('clientId')
+      //});
       
       // Preencher responses se existirem
       if (attendance.responses && typeof attendance.responses === 'object') {
@@ -141,22 +141,22 @@ const AttendanceEdit = () => {
     try {
       setLoadingData(true);
       
-      console.log('Carregando dados para o atendimento ID:', id);
+      //console.log('Carregando dados para o atendimento ID:', id);
       
       const [attendanceResponse, formsResponse] = await Promise.all([
         attendanceService.getById(id),
         attendanceFormService.list()
       ]);
 
-      console.log('Resposta do atendimento:', attendanceResponse);
-      console.log('Resposta dos formulários:', formsResponse);
+      //console.log('Resposta do atendimento:', attendanceResponse);
+      //console.log('Resposta dos formulários:', formsResponse);
 
       if (attendanceResponse.attendance) {
         setAttendance(attendanceResponse.attendance);
         if (attendanceResponse.attendance.client) {
           setSelectedClient(attendanceResponse.attendance.client);
         }
-        console.log('Atendimento carregado com sucesso:', attendanceResponse.attendance);
+        //console.log('Atendimento carregado com sucesso:', attendanceResponse.attendance);
       } else {
         console.error('Atendimento não encontrado na resposta:', attendanceResponse);
         toast.error('Atendimento não encontrado');
@@ -164,7 +164,7 @@ const AttendanceEdit = () => {
 
       if (formsResponse.forms) {
         setForms(formsResponse.forms);
-        console.log('Formulários carregados com sucesso:', formsResponse.forms);
+        //console.log('Formulários carregados com sucesso:', formsResponse.forms);
       } else {
         console.error('Formulários não encontrados na resposta:', formsResponse);
       }
@@ -214,14 +214,14 @@ const AttendanceEdit = () => {
     const currentValue = watch(fieldName) || '';
     
     // Debug log para verificar valores
-    console.log(`Campo ${field.label}:`, {
-      fieldName,
-      currentValue,
-      fieldType: field.type,
-      fieldId: field.id,
-      fieldLabel: field.label,
-      watchedValue: watch(fieldName)
-    });
+    //console.log(`Campo ${field.label}:`, {
+    //  fieldName,
+    //  currentValue,
+    //  fieldType: field.type,
+    //  fieldId: field.id,
+    //  fieldLabel: field.label,
+    //  watchedValue: watch(fieldName)
+    //});
 
     switch (field.type) {
       case 'TEXT':

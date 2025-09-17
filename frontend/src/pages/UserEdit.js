@@ -34,9 +34,9 @@ const UserEdit = () => {
   const [errors, setErrors] = useState({});
 
   // Debug: log dos valores do formulário
-  useEffect(() => {
-    console.log('formValues atualizados:', formValues);
-  }, [formValues]);
+  //useEffect(() => {
+  //  console.log('formValues atualizados:', formValues);
+  //}, [formValues]);
 
   // Função para validar os dados
   const validateForm = () => {
@@ -80,14 +80,14 @@ const UserEdit = () => {
     const loadUser = async () => {
       try {
         setLoadingUser(true);
-        console.log('Carregando usuário com ID:', id);
+        //console.log('Carregando usuário com ID:', id);
         const userData = await userService.getById(id);
-        console.log('Dados do usuário carregados:', userData);
-        console.log('userData completo:', JSON.stringify(userData, null, 2));
+        //console.log('Dados do usuário carregados:', userData);
+        //console.log('userData completo:', JSON.stringify(userData, null, 2));
         
         // Os dados podem estar aninhados, vamos verificar
         const actualUserData = userData.user || userData;
-        console.log('actualUserData:', actualUserData);
+        //console.log('actualUserData:', actualUserData);
         
         setUser(actualUserData);
         
@@ -100,10 +100,10 @@ const UserEdit = () => {
           confirmPassword: ''
         };
         
-        console.log('Dados carregados e formulário atualizado:', newFormValues);
-        console.log('actualUserData.name:', actualUserData.name);
-        console.log('actualUserData.username:', actualUserData.username);
-        console.log('actualUserData.role:', actualUserData.role);
+        //console.log('Dados carregados e formulário atualizado:', newFormValues);
+        //console.log('actualUserData.name:', actualUserData.name);
+        //console.log('actualUserData.username:', actualUserData.username);
+        //console.log('actualUserData.role:', actualUserData.role);
         
         setFormValues(newFormValues);
         setDataLoaded(true);
@@ -220,7 +220,7 @@ const UserEdit = () => {
                     error={errors.name?.message}
                     onChange={(e) => {
                       const value = e.target.value;
-                      console.log('Nome alterado para:', value);
+                      //console.log('Nome alterado para:', value);
                       setFormValues(prev => ({ ...prev, name: value }));
                     }}
                   />
@@ -232,7 +232,7 @@ const UserEdit = () => {
                     error={errors.role?.message}
                     onChange={(e) => {
                       const value = e.target.value;
-                      console.log('Função alterada para:', value);
+                      //console.log('Função alterada para:', value);
                       setFormValues(prev => ({ ...prev, role: value }));
                     }}
                   >
@@ -258,7 +258,7 @@ const UserEdit = () => {
                     error={errors.username?.message}
                     onChange={(e) => {
                       const value = e.target.value;
-                      console.log('Username alterado para:', value);
+                      //console.log('Username alterado para:', value);
                       setFormValues(prev => ({ ...prev, username: value }));
                     }}
                   />
