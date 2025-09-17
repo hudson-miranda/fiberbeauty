@@ -553,17 +553,33 @@ const dashboardController = {
   async getAllActivities(req, res) {
     try {
       const prisma = getPrismaClient();
-      const { type, page = 1, limit = 20 } = req.query;
+      const { type, page = 1, limit = 20, dateFrom, dateTo } = req.query;
       
       const skip = (page - 1) * limit;
       const take = Math.min(parseInt(limit), 50); // Máximo 50 por página
+
+      // Construir filtros de data
+      const dateFilter = {};
+      if (dateFrom || dateTo) {
+        dateFilter.createdAt = {};
+        if (dateFrom) {
+          dateFilter.createdAt.gte = new Date(dateFrom);
+        }
+        if (dateTo) {
+          // Adicionar 23:59:59 para incluir todo o dia
+          const endDate = new Date(dateTo);
+          endDate.setHours(23, 59, 59, 999);
+          dateFilter.createdAt.lte = endDate;
+        }
+      }
 
       // Buscar dados de múltiplas tabelas
       const [attendances, clients, users, forms] = await Promise.all([
         // Atendimentos
         prisma.attendance.findMany({
+          where: dateFilter,
           orderBy: { createdAt: 'desc' },
-          take: type === 'attendance_created' ? take : 20,
+          take: type === 'attendance_created' ? take : 30,
           skip: type === 'attendance_created' ? skip : 0,
           include: {
             client: {
@@ -576,22 +592,25 @@ const dashboardController = {
         }),
         // Clientes
         prisma.client.findMany({
+          where: dateFilter,
           orderBy: { createdAt: 'desc' },
-          take: type && ['client_created', 'client_updated'].includes(type) ? take : 20,
+          take: type && ['client_created', 'client_updated'].includes(type) ? take : 30,
           skip: type && ['client_created', 'client_updated'].includes(type) ? skip : 0,
-          select: { id: true, firstName: true, lastName: true, createdAt: true, updatedAt: true }
+          select: { id: true, firstName: true, lastName: true, cpf: true, createdAt: true, updatedAt: true }
         }),
         // Usuários
         prisma.user.findMany({
+          where: dateFilter,
           orderBy: { createdAt: 'desc' },
-          take: type && ['user_created', 'user_updated'].includes(type) ? take : 10,
+          take: type && ['user_created', 'user_updated'].includes(type) ? take : 20,
           skip: type && ['user_created', 'user_updated'].includes(type) ? skip : 0,
-          select: { id: true, name: true, createdAt: true, updatedAt: true }
+          select: { id: true, name: true, username: true, createdAt: true, updatedAt: true }
         }),
         // Formulários
         prisma.attendanceForm.findMany({
+          where: dateFilter,
           orderBy: { createdAt: 'desc' },
-          take: type && ['form_created', 'form_updated'].includes(type) ? take : 10,
+          take: type && ['form_created', 'form_updated'].includes(type) ? take : 20,
           skip: type && ['form_created', 'form_updated'].includes(type) ? skip : 0,
           select: { id: true, name: true, createdAt: true, updatedAt: true }
         })
@@ -600,18 +619,20 @@ const dashboardController = {
       const activities = [];
 
       // Processar atendimentos
-      if (!type || type === 'attendance_created') {
+      if (!type || type === 'attendance' || type === 'attendance_created') {
         attendances.forEach(attendance => {
           const clientName = attendance.client 
             ? `${attendance.client.firstName || ''} ${attendance.client.lastName || ''}`.trim()
             : 'Cliente não informado';
+          const userName = attendance.user?.name || 'Profissional não informado';
           
           activities.push({
             id: `attendance-${attendance.id}`,
-            type: 'attendance_created',
-            description: 'Novo atendimento realizado',
-            target: clientName || 'Cliente não informado',
-            clientName: clientName || 'Cliente não informado',
+            type: 'attendance',
+            description: `Atendimento realizado para ${clientName}`,
+            details: `Profissional: ${userName}`,
+            target: clientName,
+            clientName: clientName,
             date: new Date(attendance.createdAt).toLocaleDateString('pt-BR'),
             datetime: attendance.createdAt,
             createdAt: attendance.createdAt
@@ -620,16 +641,18 @@ const dashboardController = {
       }
 
       // Processar clientes
-      if (!type || ['client_created', 'client_updated'].includes(type)) {
+      if (!type || type === 'client' || ['client_created', 'client_updated'].includes(type)) {
         clients.forEach(client => {
           const clientName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+          const phone = client.phone ? ` - ${client.phone}` : '';
           
           // Cliente criado
-          if (!type || type === 'client_created') {
+          if (!type || type === 'client' || type === 'client_created') {
             activities.push({
               id: `client-created-${client.id}`,
-              type: 'client_created',
-              description: 'Novo cliente cadastrado',
+              type: 'client',
+              description: `Novo cliente cadastrado: ${clientName}`,
+              details: `Informações de contato registradas${phone}`,
               target: clientName || 'Cliente',
               clientName: clientName || 'Cliente',
               date: new Date(client.createdAt).toLocaleDateString('pt-BR'),
@@ -639,13 +662,14 @@ const dashboardController = {
           }
 
           // Cliente atualizado
-          if ((!type || type === 'client_updated') && 
+          if ((!type || type === 'client' || type === 'client_updated') && 
               client.updatedAt && 
               new Date(client.updatedAt).getTime() !== new Date(client.createdAt).getTime()) {
             activities.push({
               id: `client-updated-${client.id}`,
-              type: 'client_updated',
-              description: 'Cliente atualizado',
+              type: 'client',
+              description: `Dados atualizados: ${clientName}`,
+              details: `Informações do cliente foram modificadas${phone}`,
               target: clientName || 'Cliente',
               clientName: clientName || 'Cliente',
               date: new Date(client.updatedAt).toLocaleDateString('pt-BR'),
@@ -657,14 +681,17 @@ const dashboardController = {
       }
 
       // Processar usuários
-      if (!type || ['user_created', 'user_updated'].includes(type)) {
+      if (!type || type === 'user' || ['user_created', 'user_updated'].includes(type)) {
         users.forEach(user => {
+          const email = user.email ? ` - ${user.email}` : '';
+          
           // Usuário criado
-          if (!type || type === 'user_created') {
+          if (!type || type === 'user' || type === 'user_created') {
             activities.push({
               id: `user-created-${user.id}`,
-              type: 'user_created',
-              description: 'Novo usuário cadastrado',
+              type: 'user',
+              description: `Novo usuário cadastrado: ${user.name || 'Usuário'}`,
+              details: `Acesso ao sistema liberado${email}`,
               target: user.name || 'Usuário',
               clientName: user.name || 'Usuário',
               date: new Date(user.createdAt).toLocaleDateString('pt-BR'),
@@ -674,13 +701,14 @@ const dashboardController = {
           }
 
           // Usuário atualizado
-          if ((!type || type === 'user_updated') && 
+          if ((!type || type === 'user' || type === 'user_updated') && 
               user.updatedAt && 
               new Date(user.updatedAt).getTime() !== new Date(user.createdAt).getTime()) {
             activities.push({
               id: `user-updated-${user.id}`,
-              type: 'user_updated',
-              description: 'Usuário atualizado',
+              type: 'user',
+              description: `Usuário atualizado: ${user.name || 'Usuário'}`,
+              details: `Informações do usuário foram modificadas${email}`,
               target: user.name || 'Usuário',
               clientName: user.name || 'Usuário',
               date: new Date(user.updatedAt).toLocaleDateString('pt-BR'),
@@ -692,14 +720,15 @@ const dashboardController = {
       }
 
       // Processar formulários
-      if (!type || ['form_created', 'form_updated'].includes(type)) {
+      if (!type || type === 'form' || ['form_created', 'form_updated'].includes(type)) {
         forms.forEach(form => {
           // Formulário criado
-          if (!type || type === 'form_created') {
+          if (!type || type === 'form' || type === 'form_created') {
             activities.push({
               id: `form-created-${form.id}`,
-              type: 'form_created',
-              description: 'Nova ficha cadastrada',
+              type: 'form',
+              description: `Nova ficha cadastrada: ${form.name || 'Ficha'}`,
+              details: 'Formulário de atendimento criado no sistema',
               target: form.name || 'Ficha',
               clientName: form.name || 'Ficha',
               date: new Date(form.createdAt).toLocaleDateString('pt-BR'),
@@ -709,13 +738,14 @@ const dashboardController = {
           }
 
           // Formulário atualizado
-          if ((!type || type === 'form_updated') && 
+          if ((!type || type === 'form' || type === 'form_updated') && 
               form.updatedAt && 
               new Date(form.updatedAt).getTime() !== new Date(form.createdAt).getTime()) {
             activities.push({
               id: `form-updated-${form.id}`,
-              type: 'form_updated',
-              description: 'Ficha atualizada',
+              type: 'form',
+              description: `Ficha atualizada: ${form.name || 'Ficha'}`,
+              details: 'Formulário de atendimento foi modificado',
               target: form.name || 'Ficha',
               clientName: form.name || 'Ficha',
               date: new Date(form.updatedAt).toLocaleDateString('pt-BR'),
@@ -729,12 +759,18 @@ const dashboardController = {
       // Ordenar por data e aplicar paginação
       activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       
-      const startIndex = type ? 0 : skip;
-      const endIndex = type ? activities.length : startIndex + take;
-      const paginatedActivities = activities.slice(startIndex, endIndex);
+      // Aplicar filtro de tipo após aggregação se necessário
+      let filteredActivities = activities;
+      if (type && type !== 'all') {
+        filteredActivities = activities.filter(activity => activity.type === type);
+      }
+      
+      const startIndex = skip;
+      const endIndex = startIndex + take;
+      const paginatedActivities = filteredActivities.slice(startIndex, endIndex);
 
       // Contar total para paginação
-      const totalActivities = activities.length;
+      const totalActivities = filteredActivities.length;
       const totalPages = Math.ceil(totalActivities / take);
 
       res.json({
