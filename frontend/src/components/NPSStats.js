@@ -11,6 +11,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   MinusIcon,
+  StarIcon,
   CalendarIcon,
   UserIcon
 } from '@heroicons/react/24/outline';
@@ -266,20 +267,28 @@ const NPSStats = ({ clientId = null, clientData = null, showClientFilter = true 
               const percentage = statistics.total > 0 ? (item.count / statistics.total) * 100 : 0;
               return (
                 <div key={item.score} className="flex items-center">
-                  <div className="w-8 text-sm font-medium text-gray-600">
-                    {item.score}
+                  {/* Estrela + Nota */}
+                  <div className="flex items-center justify-end gap-1 w-16 shrink-0 whitespace-nowrap">
+                    <StarIcon className="h-4 w-4 text-gray-600" aria-hidden="true" />
+                    {/* largura fixa baseada em ch e números tabulares para alinhar 8/9/10 */}
+                    <span className="text-sm font-medium text-gray-600 tabular-nums w-[2ch] text-right">
+                      {item.score}
+                    </span>
                   </div>
+
+                  {/* Barra de progresso com count dentro */}
                   <div className="flex-1 mx-3">
                     <div className="bg-gray-200 rounded-full h-4 relative overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500 flex items-center justify-end pr-2 text-xs font-medium text-white"
                         style={{ width: `${percentage}%` }}
-                      />
+                      >
+                        {item.count}
+                      </div>
                     </div>
                   </div>
-                  <div className="w-12 text-sm text-gray-600 text-right">
-                    {item.count}
-                  </div>
+
+                  {/* Percentual */}
                   <div className="w-12 text-sm text-gray-500 text-right">
                     {percentage.toFixed(1)}%
                   </div>

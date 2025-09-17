@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button } from '../components/ui';
 import { DashboardSkeleton } from '../components/LoadingSpinner';
 import NPSStats from '../components/NPSStats';
+import ActivitiesModal from '../components/ActivitiesModal';
 import api from '../services/api';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -885,249 +887,355 @@ const PerformanceMetrics = ({ data, loading = false, retryCount = 0, onRetry }) 
   );
 };
 
-// Componente de Filtro de Data aprimorado
+// Componente de Filtro de Data completamente reformulado
 const DateFilter = ({ filters, onFiltersChange, onApply, onClear, loading }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [tempFilters, setTempFilters] = useState(filters);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
 
-  const presetRanges = [
+  // Atualizar filtros temporários quando os filtros principais mudarem
+  useEffect(() => {
+    setTempFilters(filters);
+  }, [filters]);
+
+  // Calcular posição do dropdown quando abrir
+  const calculateDropdownPosition = useCallback(() => {
+    if (buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 384; // w-96 = 24rem = 384px
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Calcular posição horizontal (alinhado à direita do botão)
+      let left = buttonRect.right - dropdownWidth;
+      
+      // Verificar se sai da tela pela esquerda
+      if (left < 16) {
+        left = 16; // margin mínima
+      }
+      
+      // Verificar se sai da tela pela direita
+      if (left + dropdownWidth > viewportWidth - 16) {
+        left = viewportWidth - dropdownWidth - 16;
+      }
+      
+      // Calcular posição vertical
+      let top = buttonRect.bottom + 12;
+      
+      // Verificar se sai da tela por baixo
+      const dropdownHeight = 400; // altura estimada do dropdown
+      if (top + dropdownHeight > viewportHeight - 16) {
+        top = buttonRect.top - dropdownHeight - 12; // mostrar acima do botão
+      }
+      
+      setDropdownPosition({ top, left });
+    }
+  }, []);
+
+  // Abrir/fechar dropdown
+  const toggleDropdown = useCallback(() => {
+    if (!isOpen) {
+      calculateDropdownPosition();
+    }
+    setIsOpen(!isOpen);
+  }, [isOpen, calculateDropdownPosition]);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+          buttonRef.current && !buttonRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Recalcular posição quando a janela for redimensionada ou rolada
+  useEffect(() => {
+    if (isOpen) {
+      const handleReposition = () => {
+        calculateDropdownPosition();
+      };
+
+      // Usar passive listeners para melhor performance
+      window.addEventListener('scroll', handleReposition, { passive: true });
+      window.addEventListener('resize', handleReposition, { passive: true });
+
+      return () => {
+        window.removeEventListener('scroll', handleReposition);
+        window.removeEventListener('resize', handleReposition);
+      };
+    }
+  }, [isOpen, calculateDropdownPosition]);
+
+  // Presets de período
+  const presets = [
     { 
-      label: 'Últimos 7 dias', 
+      label: 'Hoje', 
+      value: 'today',
+      days: 0,
+      description: 'Apenas hoje'
+    },
+    { 
+      label: '7 dias', 
       value: '7',
-      icon: Calendar,
-      getRange: () => {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(start.getDate() - 7);
-        return { start, end };
-      }
+      days: 7,
+      description: 'Últimos 7 dias'
     },
     { 
-      label: 'Últimos 30 dias', 
+      label: '30 dias', 
       value: '30',
-      icon: Calendar,
-      getRange: () => {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(start.getDate() - 30);
-        return { start, end };
-      }
+      days: 30,
+      description: 'Últimos 30 dias'
     },
     { 
-      label: 'Últimos 90 dias', 
+      label: '90 dias', 
       value: '90',
-      icon: Calendar,
-      getRange: () => {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(start.getDate() - 90);
-        return { start, end };
-      }
+      days: 90,
+      description: 'Últimos 90 dias'
     },
     { 
       label: 'Este ano', 
       value: 'year',
-      icon: Calendar,
-      getRange: () => {
-        const end = new Date();
-        const start = new Date(end.getFullYear(), 0, 1);
-        return { start, end };
-      }
+      days: null,
+      description: 'Ano atual'
     }
   ];
 
-  const formatDate = (date) => {
-    if (!date) return '';
-    return date.toISOString().split('T')[0];
+  const getDateRange = (preset) => {
+    const today = new Date();
+    const end = new Date(today);
+    let start = new Date(today);
+
+    if (preset.value === 'today') {
+      start = new Date(today);
+    } else if (preset.value === 'year') {
+      start = new Date(today.getFullYear(), 0, 1);
+    } else if (preset.days) {
+      start.setDate(start.getDate() - preset.days);
+    }
+
+    return {
+      dateFrom: start.toISOString().split('T')[0],
+      dateTo: end.toISOString().split('T')[0]
+    };
   };
 
   const handlePresetClick = (preset) => {
-    setIsAnimating(true);
-    const { start, end } = preset.getRange();
-    onFiltersChange({
-      ...filters,
-      dateFrom: formatDate(start),
-      dateTo: formatDate(end),
+    const dateRange = getDateRange(preset);
+    const newFilters = {
+      ...tempFilters,
+      ...dateRange,
       period: preset.value
-    });
-    setTimeout(() => setIsAnimating(false), 300);
+    };
+    
+    setTempFilters(newFilters);
+    onFiltersChange(newFilters);
+    
+    // Aplicar automaticamente após um pequeno delay
+    setTimeout(() => {
+      onApply();
+      setIsOpen(false);
+    }, 150);
   };
 
-  const handleCustomDateChange = (field, value) => {
-    onFiltersChange({
-      ...filters,
+  const handleDateChange = (field, value) => {
+    const newFilters = {
+      ...tempFilters,
       [field]: value,
       period: 'custom'
-    });
+    };
+    setTempFilters(newFilters);
   };
 
-  const isActive = filters.dateFrom || filters.dateTo || filters.period !== '30';
+  const handleApplyCustom = () => {
+    onFiltersChange(tempFilters);
+    onApply();
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    const clearedFilters = {
+      dateFrom: '',
+      dateTo: '',
+      period: '30'
+    };
+    setTempFilters(clearedFilters);
+    onFiltersChange(clearedFilters);
+    onClear();
+    setIsOpen(false);
+  };
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = filters.period !== '30' || filters.dateFrom || filters.dateTo;
+  
+  // Obter label do filtro ativo
+  const getActiveFilterLabel = () => {
+    if (filters.period === 'custom' && filters.dateFrom && filters.dateTo) {
+      return 'Personalizado';
+    }
+    const activePreset = presets.find(p => p.value === filters.period);
+    return activePreset ? activePreset.label : '30 dias';
+  };
 
   return (
-    <div className="relative">
-      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-        <a
-          href="#"
-          role="button"
-          onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/20 text-white border border-white/30 font-medium hover:bg-white/30 hover:text-white hover:border-white/50 transition-all duration-200 px-3 py-2 whitespace-nowrap"
+    <div className="relative inline-block">
+      {/* Botão do Filtro */}
+      <motion.button
+        ref={buttonRef}
+        onClick={toggleDropdown}
+        className={`
+          inline-flex items-center justify-center gap-2 rounded-lg bg-white/20 text-white border border-white/30 font-medium hover:bg-white/30 hover:text-white hover:border-white/50 transition-all duration-200 px-3 py-2 
+          ${hasActiveFilters 
+            ? 'bg-white text-primary-600 border border-primary-200' 
+            : 'bg-white text-primary-600 border border-primary-200'
+          }
+        `}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        disabled={loading}
+      >
+        <Filter className="w-4 h-4" />
+        <span className="hidden sm:inline">
+          {hasActiveFilters ? getActiveFilterLabel() : 'Filtros'}
+        </span>
+        {hasActiveFilters && (
+          <span className="bg-primary-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+            ●
+          </span>
+        )}
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
         >
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-            <Filter className="w-4 h-4" />
-          </motion.div>
-          <span className="hidden sm:inline font-medium">Filtros</span>
-          <AnimatePresence>
-            {isActive && (
-              <motion.span
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="bg-gold-400 text-gold-900 text-xs px-2 py-0.5 rounded-full font-bold"
-              >
-                {filters.period === 'custom' ? 'Custom' : `${filters.period}d`}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </a>
-      </motion.div>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </motion.div>
+      </motion.button>
 
-      <AnimatePresence>
-        {isOpen && (
+      {/* Dropdown usando Portal */}
+      {isOpen && createPortal(
+        <AnimatePresence>
           <motion.div
+            ref={dropdownRef}
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 top-full mt-2 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 z-50 overflow-hidden"
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="fixed w-[90vw] max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+            style={{
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              zIndex: 9999,
+              //maxWidth: '24rem'
+            }}
           >
             {/* Header */}
-            <div className="p-6 bg-gradient-to-r from-primary-50 to-gold-50 border-b border-gray-200/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-primary-600" />
-                  <h3 className="text-lg font-bold text-gray-900">Filtros de Data</h3>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-white/50 rounded-full transition-colors"
-                >
-                  <XMarkIcon className="w-5 h-5 text-gray-600" />
-                </motion.button>
-              </div>
+            <div className="p-4 bg-gradient-to-r from-primary-50 to-primary-100 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Filter className="w-5 h-5 text-primary-600" />
+                Filtrar Período
+              </h3>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1 hover:bg-white/70 rounded-full transition-colors"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-500" />
+              </button>
             </div>
 
-            <div className="p-6">
-              {/* Presets */}
-              <div className="mb-6">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 block">
+            {/* Conteúdo */}
+            <div className="p-5 space-y-6">
+              {/* Presets Rápidos */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Períodos Rápidos
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {presetRanges.map((preset, index) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {presets.map((preset) => (
                     <motion.button
                       key={preset.value}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
                       onClick={() => handlePresetClick(preset)}
                       className={`
-                        group relative px-3 py-3 text-sm rounded-xl border-2 transition-all duration-200
-                        ${filters.period === preset.value
-                          ? 'bg-gradient-to-r from-primary-500 to-gold-500 text-white border-transparent shadow-lg'
-                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-primary-300 hover:shadow-md'
+                        p-3 rounded-xl border transition-all duration-200 text-center
+                        ${tempFilters.period === preset.value
+                          ? 'bg-primary-50 border-primary-300 text-primary-700 shadow-sm'
+                          : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300'
                         }
                       `}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      <div className="flex items-center gap-2">
-                        <preset.icon className="w-4 h-4" />
-                        <span className="font-medium">{preset.label}</span>
-                      </div>
-                      {filters.period === preset.value && (
-                        <motion.div
-                          layoutId="activePreset"
-                          className="absolute inset-0 bg-white/20 rounded-xl"
-                        />
-                      )}
+                      <div className="font-medium text-sm">{preset.label}</div>
                     </motion.button>
                   ))}
                 </div>
               </div>
 
-              {/* Custom Date Range */}
-              <div className="space-y-4">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+              {/* Período Personalizado */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Período Personalizado
                 </label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-gray-600 mb-2 font-medium">
-                      Data Inicial
-                    </label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Data Inicial</label>
                     <input
                       type="date"
-                      value={filters.dateFrom || ''}
-                      onChange={(e) => handleCustomDateChange('dateFrom', e.target.value)}
-                      className="w-full px-4 py-3 text-sm border-2 border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      value={tempFilters.dateFrom || ''}
+                      onChange={(e) => handleDateChange('dateFrom', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-2 font-medium">
-                      Data Final
-                    </label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Data Final</label>
                     <input
                       type="date"
-                      value={filters.dateTo || ''}
-                      onChange={(e) => handleCustomDateChange('dateTo', e.target.value)}
-                      className="w-full px-4 py-3 text-sm border-2 border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      value={tempFilters.dateTo || ''}
+                      onChange={(e) => handleDateChange('dateTo', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200/50">
-                <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      onApply();
-                      setIsOpen(false);
-                    }}
-                    loading={loading}
-                    className="w-full bg-gradient-to-r from-primary-600 to-gold-600 hover:from-primary-700 hover:to-gold-700 text-white font-semibold"
-                  >
-                    {loading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Aplicar
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-                <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      onClear();
-                      setIsOpen(false);
-                    }}
-                    className="w-full border-2 border-gray-200 hover:border-gray-300 font-semibold"
-                  >
-                    Limpar
-                  </Button>
-                </motion.div>
+              {/* Botões de Ação */}
+              <div className="flex gap-3">
+                <motion.button
+                  onClick={handleApplyCustom}
+                  disabled={loading || (tempFilters.period === 'custom' && (!tempFilters.dateFrom || !tempFilters.dateTo))}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {loading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin mx-auto" />
+                  ) : (
+                    'Aplicar'
+                  )}
+                </motion.button>
+                <motion.button
+                  onClick={handleClear}
+                  className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Limpar
+                </motion.button>
               </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -1327,31 +1435,6 @@ const TopClientsRanking = ({ clients = [] }) => {
             <EmptyState />
           )}
         </div>
-        
-        {/* Footer statistics */}
-        {clients.length > 0 && (
-          <motion.div 
-            className="mt-6 pt-6 border-t border-gray-200/50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-          >
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-primary-600">
-                  {clients.reduce((acc, client) => acc + (client.attendances || 0), 0)}
-                </p>
-                <p className="text-sm text-gray-600 truncate">Atendimentos no Período</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-600">
-                  {clients.length}
-                </p>
-                <p className="text-sm text-gray-600 truncate">Top Clientes</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </Card>
     </motion.div>
   );
@@ -1363,14 +1446,20 @@ const RecentActivity = ({ activities = [], onShowAllActivities }) => {
   const [ref, controls] = useScrollAnimation();
 
   const getActivityIcon = (activity, index) => {
-    // Cores especiais para as primeiras atividades (mais recentes)
-    const priorityColors = [
-      'bg-gradient-to-r from-primary-400 to-primary-600 text-white shadow-primary-500/25', // 1ª mais recente
-      'bg-gradient-to-r from-purple-400 to-purple-600 text-white shadow-purple-500/25', // 2ª mais recente
-      'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-blue-500/25', // 3ª mais recente
-      'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-emerald-500/25', // 4ª mais recente
-      'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-orange-500/25' // 5ª mais recente
-    ];
+    // Cores baseadas no tipo de atividade, igual ao modal
+    const getColorByType = (type) => {
+      if (type?.includes('attendance')) {
+        return 'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-blue-500/25'; // Azul para atendimentos
+      } else if (type?.includes('client')) {
+        return 'bg-gradient-to-r from-green-400 to-green-600 text-white shadow-green-500/25'; // Verde para clientes
+      } else if (type?.includes('user')) {
+        return 'bg-gradient-to-r from-purple-400 to-purple-600 text-white shadow-purple-500/25'; // Roxo para usuários
+      } else if (type?.includes('form')) {
+        return 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-orange-500/25'; // Laranja para formulários
+      } else {
+        return 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-gray-500/25'; // Cinza para outros
+      }
+    };
     
     const iconMap = {
       'client_created': UserPlus,
@@ -1385,7 +1474,7 @@ const RecentActivity = ({ activities = [], onShowAllActivities }) => {
     
     return {
       icon: iconMap[activity.type] || iconMap.default,
-      color: priorityColors[index] || priorityColors[4] // Se passar de 5, usa a última cor
+      color: getColorByType(activity.type)
     };
   };
 
@@ -1579,31 +1668,6 @@ const RecentActivity = ({ activities = [], onShowAllActivities }) => {
             <EmptyState />
           )}
         </div>
-
-        {/* Footer statistics */}
-        {activities.length > 0 && (
-          <motion.div 
-            className="mt-6 pt-6 border-t border-gray-200/50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-          >
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-primary-600">
-                  {activities.length}
-                </p>
-                <p className="text-sm text-gray-600">Atividades Recentes</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-600">
-                  {activities.filter(a => new Date() - new Date(a.createdAt || a.timestamp || a.datetime || a.date) < 86400000).length}
-                </p>
-                <p className="text-sm text-gray-600">Hoje</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </Card>
     </motion.div>
   );
@@ -1640,34 +1704,9 @@ const Dashboard = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState(null);
   
-  // Estado para o modal de atividades
+  // Estado para o modal de atividades (simplificado)
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
-  const [allActivities, setAllActivities] = useState([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const [activityFilters, setActivityFilters] = useState({
-    type: 'all',
-    dateFrom: '',
-    dateTo: '',
-    limit: 20,
-    offset: 0
-  });
 
-  // Função para fechar modal e limpar dados
-  const closeActivitiesModal = () => {
-    setShowActivitiesModal(false);
-    // Limpar dados quando fechar para evitar problemas de estado
-    setTimeout(() => {
-      setAllActivities([]);
-      setActivityFilters({
-        type: 'all',
-        dateFrom: '',
-        dateTo: '',
-        limit: 20,
-        offset: 0
-      });
-    }, 300); // Aguarda animação de saída
-  };
-  
   // Estado para filtros de data
   const [filters, setFilters] = useState({
     dateFrom: '',
@@ -1832,6 +1871,7 @@ const Dashboard = () => {
   };
 
   const handleApplyFilters = () => {
+    console.log('Aplicando filtros:', filters);
     loadDashboardData(filters);
   };
 
@@ -1845,378 +1885,11 @@ const Dashboard = () => {
     loadDashboardData(defaultFilters);
   };
 
-  // Função para buscar todas as atividades com filtros
-  const loadAllActivities = async (customFilters = null) => {
-    try {
-      setActivitiesLoading(true);
-      
-      // Usar filtros customizados ou os filtros atuais de atividades
-      const queryFilters = customFilters || activityFilters;
-      const params = new URLSearchParams();
-      
-      if (queryFilters.type && queryFilters.type !== 'all') params.append('type', queryFilters.type);
-      if (queryFilters.dateFrom) params.append('dateFrom', queryFilters.dateFrom);
-      if (queryFilters.dateTo) params.append('dateTo', queryFilters.dateTo);
-      if (queryFilters.limit) params.append('limit', queryFilters.limit);
-      if (queryFilters.offset) params.append('offset', queryFilters.offset);
-      
-      const response = await api.get(`/dashboard/activities?${params.toString()}`);
-      const activitiesData = response.data;
-      
-      // Se offset > 0, significa que estamos carregando mais, então fazemos append
-      if (queryFilters.offset > 0) {
-        setAllActivities(prev => [...prev, ...(activitiesData.activities || [])]);
-      } else {
-        // Caso contrário, substitui completamente
-        setAllActivities(activitiesData.activities || []);
-      }
-      
-    } catch (error) {
-      console.error('Erro ao carregar atividades:', error);
-      // Se offset > 0, não limpa as atividades existentes em caso de erro
-      if (!customFilters?.offset && !activityFilters.offset) {
-        setAllActivities([]);
-      }
-    } finally {
-      setActivitiesLoading(false);
-    }
-  };
-
-  // Handler para aplicar filtros de atividades
-  const handleActivityFiltersChange = (newFilters) => {
-    setActivityFilters(newFilters);
-  };
-
-  const handleApplyActivityFilters = () => {
-    const filtersWithReset = { ...activityFilters, offset: 0 }; // Reset offset
-    setActivityFilters(filtersWithReset);
-    loadAllActivities(filtersWithReset);
-  };
-
-  const handleClearActivityFilters = () => {
-    const defaultFilters = {
-      type: 'all',
-      dateFrom: '',
-      dateTo: '',
-      limit: 20,
-      offset: 0
-    };
-    setActivityFilters(defaultFilters);
-    loadAllActivities(defaultFilters);
-  };
-
   if (loading) {
     return <DashboardSkeleton />;
   }
 
-  // Componente Modal para todas as atividades
-  const ActivitiesModal = () => {
-    const activityTypes = [
-      { value: 'all', label: 'Todas as atividades' },
-      { value: 'attendance_created', label: 'Atendimentos criados' },
-      { value: 'attendance_updated', label: 'Atendimentos atualizados' },
-      { value: 'client_created', label: 'Clientes criados' },
-      { value: 'client_updated', label: 'Clientes atualizados' },
-      { value: 'user_created', label: 'Usuários criados' },
-      { value: 'user_updated', label: 'Usuários atualizados' },
-      { value: 'form_created', label: 'Formulários criados' },
-      { value: 'form_updated', label: 'Formulários atualizados' }
-    ];
 
-    // Função para formatar tempo relativo
-    const formatRelativeTime = (date) => {
-      if (!date) return 'Data inválida';
-      
-      const now = new Date();
-      const activityDate = new Date(date);
-      const diffTime = Math.abs(now - activityDate);
-      const diffMinutes = Math.ceil(diffTime / (1000 * 60));
-      const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffMinutes < 60) {
-        return `${diffMinutes === 1 ? 'há 1 minuto' : `há ${diffMinutes}m`}`;
-      } else if (diffHours < 24) {
-        return `${diffHours === 1 ? 'há 1 hora' : `há ${diffHours}h`}`;
-      } else {
-        return `${diffDays === 1 ? 'ontem' : `há ${diffDays}d`}`;
-      }
-    };
-
-    // Função para obter ícone e cor baseado no tipo de atividade
-    const getActivityTypeIcon = (type) => {
-      const iconMap = {
-        'attendance_created': { icon: Calendar, color: 'text-blue-600' },
-        'attendance_updated': { icon: Activity, color: 'text-blue-500' },
-        'client_created': { icon: UserPlus, color: 'text-green-600' },
-        'client_updated': { icon: Users2, color: 'text-green-500' },
-        'user_created': { icon: UserPlus, color: 'text-purple-600' },
-        'user_updated': { icon: Users2, color: 'text-purple-500' },
-        'form_created': { icon: FileText, color: 'text-orange-600' },
-        'form_updated': { icon: FileText, color: 'text-orange-500' }
-      };
-      
-      return iconMap[type] || { icon: Activity, color: 'text-gray-600' };
-    };
-
-    const formatDate = (date) => {
-      if (!date) return '';
-      return new Date(date).toISOString().split('T')[0];
-    };
-
-    // Função para aplicar filtros de data pré-definidos
-    const applyDatePreset = (days) => {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - days);
-      
-      const newFilters = {
-        ...activityFilters,
-        dateFrom: formatDate(start),
-        dateTo: formatDate(end),
-        offset: 0 // Reset offset quando aplicar novo filtro
-      };
-      
-      setActivityFilters(newFilters);
-      loadAllActivities(newFilters);
-    };
-
-    // Carregar atividades quando o modal abrir pela primeira vez
-    useEffect(() => {
-      if (showActivitiesModal && allActivities.length === 0) {
-        loadAllActivities();
-      }
-    }, [showActivitiesModal]); // Remover dependências desnecessárias
-
-    return (
-      <AnimatePresence>
-        {showActivitiesModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && closeActivitiesModal()}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-            >
-              {/* Header do Modal */}
-              <div className="bg-gradient-to-r from-primary-600 to-gold-600 text-white p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-xl">
-                      <Activity className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold">Todas as Atividades</h2>
-                      <p className="text-white/80 text-sm">Visualize e filtre todas as atividades do sistema</p>
-                    </div>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={closeActivitiesModal}
-                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                  >
-                    <XMarkIcon className="w-6 h-6" />
-                  </motion.button>
-                </div>
-              </div>
-
-              {/* Filtros */}
-              <div className="p-6 border-b border-gray-200 bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {/* Filtro por tipo */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Atividade
-                    </label>
-                    <select
-                      value={activityFilters.type}
-                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, type: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      {activityTypes.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Data inicial */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data Inicial
-                    </label>
-                    <input
-                      type="date"
-                      value={activityFilters.dateFrom}
-                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, dateFrom: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Data final */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data Final
-                    </label>
-                    <input
-                      type="date"
-                      value={activityFilters.dateTo}
-                      onChange={(e) => handleActivityFiltersChange({ ...activityFilters, dateTo: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Botões de ação */}
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      onClick={handleApplyActivityFilters}
-                      loading={activitiesLoading}
-                      className="bg-primary-600 hover:bg-primary-700 text-white"
-                      size="sm"
-                    >
-                      Aplicar Filtros
-                    </Button>
-                    <Button
-                      onClick={handleClearActivityFilters}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Filtros rápidos por data */}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filtros Rápidos
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { label: 'Hoje', days: 1 },
-                      { label: 'Últimos 7 dias', days: 7 },
-                      { label: 'Últimos 30 dias', days: 30 },
-                      { label: 'Últimos 90 dias', days: 90 }
-                    ].map((preset) => (
-                      <motion.button
-                        key={preset.days}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => applyDatePreset(preset.days)}
-                        className="px-3 py-1 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                      >
-                        {preset.label}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista de atividades */}
-              <div className="flex-1 overflow-y-auto p-6 max-h-96">
-                {activitiesLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
-                        <div className="w-12 h-12 bg-gray-300 rounded-lg"></div>
-                        <div className="flex-1">
-                          <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-gray-300 rounded w-1/2"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : allActivities.length > 0 ? (
-                  <motion.div 
-                    variants={staggerContainer}
-                    initial="initial"
-                    animate="animate"
-                    className="space-y-4"
-                  >
-                    {allActivities.map((activity, index) => {
-                      const { icon: TypeIcon, color: typeColor } = getActivityTypeIcon(activity.type);
-                      
-                      return (
-                        <motion.div
-                          key={activity.id || index}
-                          variants={fadeInUp}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-primary-200 hover:shadow-md transition-all duration-200"
-                        >
-                          {/* Ícone da atividade */}
-                          <div className={`flex items-center justify-center w-12 h-12 rounded-lg bg-gray-100 ${typeColor}`}>
-                            <TypeIcon className="w-6 h-6" />
-                          </div>
-                          
-                          {/* Conteúdo da atividade */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className="font-semibold text-gray-900 truncate">
-                                {activity.description || activityTypes.find(t => t.value === activity.type)?.label || 'Atividade'}
-                              </h4>
-                              <span className="text-sm text-gray-500 flex-shrink-0">
-                                {formatRelativeTime(activity.createdAt || activity.datetime)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm text-gray-600">
-                              <span className="truncate">
-                                {activity.clientName || activity.userName || activity.target || 'Sistema'}
-                              </span>
-                              <span className="text-xs text-gray-400 flex-shrink-0">
-                                {activity.type}
-                              </span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                      Nenhuma atividade encontrada
-                    </h3>
-                    <p className="text-gray-500 text-sm">
-                      Tente ajustar os filtros para encontrar atividades
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>
-                    {allActivities.length} atividade(s) encontrada(s)
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        const newFilters = { ...activityFilters, limit: activityFilters.limit + 20 };
-                        setActivityFilters(newFilters);
-                        loadAllActivities(newFilters);
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Carregar mais
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  };
 
   return (
     <motion.div 
@@ -2234,7 +1907,7 @@ const Dashboard = () => {
         {/* Header Premium */}
         <motion.div
           variants={fadeInUp}
-          className="relative overflow-hidden"
+          className="relative overflow-hidden z-[150]"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 rounded-3xl opacity-95" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/20 rounded-3xl" />
@@ -2279,7 +1952,7 @@ const Dashboard = () => {
               
               {/* Ações */}
               <motion.div 
-                className="flex flex-wrap md:flex-nowrap items-center justify-end gap-2 sm:gap-3"
+                className="flex flex-wrap md:flex-nowrap items-center justify-end gap-2 sm:gap-3 relative z-[200]"
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
@@ -2438,7 +2111,10 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Modal de Atividades */}
-      <ActivitiesModal />
+      <ActivitiesModal 
+        isOpen={showActivitiesModal} 
+        onClose={() => setShowActivitiesModal(false)} 
+      />
     </motion.div>
   );
 };

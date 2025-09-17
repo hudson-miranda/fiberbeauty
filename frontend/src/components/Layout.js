@@ -239,7 +239,7 @@ const Layout = () => {
             <span className="text-white font-bold text-lg">F</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">
               Fiber Beauty
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Gestão Inteligente</p>
