@@ -1,10 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -45,14 +46,22 @@ function App() {
                     <Layout />
                   </ProtectedRoute>
                 }>
-                {/* Dashboard */}
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
+                {/* Redirecionamento baseado no role */}
+                <Route index element={<RoleBasedRedirect />} />
+                <Route path="dashboard" element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
                 
                 {/* Clientes */}
                 <Route path="clients" element={<ClientsList />} />
                 <Route path="clients/new" element={<ClientForm />} />
-                <Route path="clients/:id" element={<ClientDetails />} />
+                <Route path="clients/:id" element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <ClientDetails />
+                  </ProtectedRoute>
+                } />
                 <Route path="clients/:id/edit" element={<ClientForm />} />
                 
                 {/* Atendimentos */}
@@ -117,7 +126,7 @@ function App() {
               </Route>
               
               {/* Rota catch-all */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<RoleBasedRedirect />} />
             </Routes>
             
             {/* Toast notifications */}

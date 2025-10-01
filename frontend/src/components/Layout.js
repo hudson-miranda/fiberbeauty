@@ -8,7 +8,6 @@ import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
   UserGroupIcon,
-  ChartBarIcon,
   Bars3Icon,
   XMarkIcon,
   ArrowRightOnRectangleIcon,
@@ -190,7 +189,7 @@ const Layout = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: HomeIcon,
-      roles: ['ADMIN', 'ATTENDANT'],
+      roles: ['ADMIN'],
     },
     {
       name: 'Clientes',

@@ -43,8 +43,8 @@ const clientController = {
 
       const where = {
         // Filtro de status ativo/inativo
-        ...(active !== '' ? { isActive: active === 'true' } : 
-            includeInactive !== 'true' ? { isActive: true } : {}),
+        // Se active especificado, usar esse valor; senão mostrar apenas ativos por padrão
+        ...(active !== '' ? { isActive: active === 'true' } : { isActive: true }),
         
         // Filtro de busca
         ...(orConditions.length ? { OR: orConditions } : {}),
@@ -148,7 +148,7 @@ const clientController = {
         },
       });
 
-      if (!client || !client.isActive) {
+      if (!client) {
         return res.status(404).json({
           error: 'Cliente não encontrado',
           code: 'CLIENT_NOT_FOUND',
@@ -222,7 +222,7 @@ const clientController = {
         where: { id },
       });
 
-      if (!existingClient || !existingClient.isActive) {
+      if (!existingClient) {
         return res.status(404).json({
           error: 'Cliente não encontrado',
           code: 'CLIENT_NOT_FOUND',
@@ -266,7 +266,7 @@ const clientController = {
     }
   },
 
-  // Desativar cliente (soft delete)
+  // Excluir cliente permanentemente (hard delete)
   async delete(req, res) {
     try {
       const { id } = req.params;
@@ -281,23 +281,42 @@ const clientController = {
 
       const client = await prisma.client.findUnique({
         where: { id },
+        include: {
+          attendances: true,
+          npsRatings: true,
+        },
       });
 
-      if (!client || !client.isActive) {
+      if (!client) {
         return res.status(404).json({
           error: 'Cliente não encontrado',
           code: 'CLIENT_NOT_FOUND',
         });
       }
 
-      await prisma.client.update({
-        where: { id },
-        data: { isActive: false },
-      });
+      // Verificar se cliente tem atendimentos ou ratings NPS
+      if (client.attendances.length > 0 || client.npsRatings.length > 0) {
+        // Se tem histórico, apenas inativar (soft delete)
+        await prisma.client.update({
+          where: { id },
+          data: { isActive: false },
+        });
 
-      res.json({
-        message: 'Cliente excluído com sucesso',
-      });
+        res.json({
+          message: 'Cliente desativado com sucesso (preservando histórico)',
+          type: 'soft_delete'
+        });
+      } else {
+        // Se não tem histórico, pode excluir permanentemente
+        await prisma.client.delete({
+          where: { id },
+        });
+
+        res.json({
+          message: 'Cliente excluído permanentemente',
+          type: 'hard_delete'
+        });
+      }
     } catch (error) {
       console.error('Erro ao excluir cliente:', error);
       res.status(500).json({
@@ -317,7 +336,7 @@ const clientController = {
         where: { cpf: cleanCpf },
       });
 
-      if (!client || !client.isActive) {
+      if (!client) {
         return res.status(404).json({
           error: 'Cliente não encontrado',
           code: 'CLIENT_NOT_FOUND',

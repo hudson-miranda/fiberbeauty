@@ -21,6 +21,7 @@ const DataTable = ({
   onStartAttendance,
   onEndAttendance,
   currentUser,
+  isAdmin = true, // Nova prop para controle de permissão admin
   loading = false,
   className = '',
   responsive = true // Nova prop para controle de responsividade
@@ -61,7 +62,7 @@ const DataTable = ({
     
     return (
       <div className="flex items-center justify-end space-x-0.5 sm:space-x-1 lg:space-x-2">
-        {onView && (
+        {onView && isAdmin && (
           <Button
             variant="ghost"
             size="sm"
@@ -86,7 +87,7 @@ const DataTable = ({
         )}
         
         {/* Botões para controle de atendimento */}
-        {onStartAttendance && onEndAttendance && (
+        {onStartAttendance && onEndAttendance && item.isActive && (
           item.hasActiveAttendance ? (
             <Button
               variant="ghost"
@@ -147,7 +148,7 @@ const DataTable = ({
           </Button>
         )}
         
-        {onDelete && !isCurrentUser && (
+        {onDelete && !isCurrentUser && isAdmin && (
           <Button
             variant="ghost"
             size="sm"
@@ -203,7 +204,11 @@ const DataTable = ({
         </thead>
         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
           {data.map((item, index) => (
-            <tr key={item.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+            <tr key={item.id || index} className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 ${
+              item.isActive === false 
+                ? 'bg-gray-50 dark:bg-gray-900 opacity-75 border-l-4 border-red-400' 
+                : ''
+            }`}>
               {columns.map((column) => {
                 const value = column.accessor ? column.accessor(item) : item[column.key];
                 return (

@@ -10,6 +10,7 @@ import ViewSwitcher from '../components/ViewSwitcher';
 import DataTable from '../components/DataTable';
 import { CardSkeleton } from '../components/LoadingSpinner';
 import { useViewMode } from '../hooks/useViewMode';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
 import {
@@ -26,7 +27,7 @@ import {
   StopIcon
 } from '@heroicons/react/24/outline';
 
-const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEndAttendance }) => {
+const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEndAttendance, isAdmin }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('pt-BR');
@@ -74,15 +75,17 @@ const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEnd
 
         {/* Actions */}
         <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onView(client)}
-            className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-          >
-            <EyeIcon className="h-4 w-4 mr-1" />
-            <span className="text-xs">Ver</span>
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onView(client)}
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            >
+              <EyeIcon className="h-4 w-4 mr-1" />
+              <span className="text-xs">Ver</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -113,15 +116,17 @@ const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEnd
               <span className="text-xs">Iniciar</span>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(client)}
-            className="text-red-600 hover:text-red-700"
-          >
-            <TrashIcon className="h-4 w-4 mr-1" />
-            <span className="text-xs">Excluir</span>
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(client)}
+              className="text-red-600 hover:text-red-700"
+            >
+              <TrashIcon className="h-4 w-4 mr-1" />
+              <span className="text-xs">Excluir</span>
+            </Button>
+          )}
         </div>
       </div>
     </Card>
@@ -238,6 +243,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, client, onConfirm, loading }) => 
 
 const ClientsList = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -450,16 +456,18 @@ const ClientsList = () => {
         </p>
       </div>
 
-      {/* Botão de novo usuário */}
-      <div className="w-full sm:w-auto">
-        <Link
-          to="/clients/new"
-          className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-        >
-          <PlusIcon className="w-4 h-4" />
-          <span>Novo Cliente</span>
-        </Link>
-      </div>
+      {/* Botão de novo usuário - Apenas Admin */}
+      {isAdmin && (
+        <div className="w-full sm:w-auto">
+          <Link
+            to="/clients/new"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <span>Novo Cliente</span>
+          </Link>
+        </div>
+      )}
     </div>
 
       {/* Filtros e Busca */}
@@ -526,6 +534,7 @@ const ClientsList = () => {
                   onView={handleView}
                   onStartAttendance={handleStartAttendance}
                   onEndAttendance={handleEndAttendance}
+                  isAdmin={isAdmin}
                 />
               ))}
             </div>
@@ -540,6 +549,7 @@ const ClientsList = () => {
                 onStartAttendance={handleStartAttendance}
                 onEndAttendance={handleEndAttendance}
                 loading={loading}
+                isAdmin={isAdmin}
               />
             </div>
           )}
@@ -567,13 +577,15 @@ const ClientsList = () => {
               : 'Comece cadastrando seu primeiro cliente.'
             }
           </p>
-          <Link to="/clients/new">
-            <Button>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Cadastrar Primeiro Cliente</span>
-              <span className="sm:hidden">Novo Cliente</span>
-            </Button>
-          </Link>
+          {isAdmin && (
+            <Link to="/clients/new">
+              <Button>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Cadastrar Primeiro Cliente</span>
+                <span className="sm:hidden">Novo Cliente</span>
+              </Button>
+            </Link>
+          )}
         </Card>
       )}
 

@@ -33,7 +33,11 @@ const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEnd
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow dark:bg-gray-800 h-full flex flex-col min-h-[280px]">
+    <Card className={`hover:shadow-lg transition-shadow h-full flex flex-col min-h-[280px] ${
+      client.isActive 
+        ? 'dark:bg-gray-800' 
+        : 'bg-gray-50 dark:bg-gray-900 opacity-75 border-l-4 border-red-400'
+    }`}>
       <div className="flex flex-col h-full p-4 sm:p-5 lg:p-6">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-4">
@@ -96,26 +100,28 @@ const ClientCard = ({ client, onEdit, onDelete, onView, onStartAttendance, onEnd
           >
             <PencilIcon className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
-          {client.hasActiveAttendance ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEndAttendance(client)}
-              className="text-orange-600 hover:text-orange-700"
-              title="Encerrar Atendimento"
-            >
-              <StopIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onStartAttendance(client)}
-              className="text-green-600 hover:text-green-700"
-              title="Iniciar Atendimento"
-            >
-              <PlayIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+          {client.isActive && (
+            client.hasActiveAttendance ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEndAttendance(client)}
+                className="text-orange-600 hover:text-orange-700"
+                title="Encerrar Atendimento"
+              >
+                <StopIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStartAttendance(client)}
+                className="text-green-600 hover:text-green-700"
+                title="Iniciar Atendimento"
+              >
+                <PlayIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            )
           )}
           <Button
             variant="ghost"
@@ -251,7 +257,7 @@ const ClientsList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [viewMode, setViewMode] = useViewMode('clientsViewMode', 'cards');
   const [filters, setFilters] = useState({
-    status: '',
+    status: 'active', // Padrão: mostrar apenas ativos
     dateFrom: '',
     dateTo: ''
   });

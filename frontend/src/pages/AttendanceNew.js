@@ -292,6 +292,100 @@ const AttendanceNew = () => {
                       </label>
                     </div>
                   )}
+
+                  {field.type === 'RADIO' && field.options && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        {field.label}{field.required && ' *'}
+                      </label>
+                      <div className="space-y-2">
+                        {field.options.map((option, index) => (
+                          <div key={index} className="flex items-center">
+                            <input
+                              type="radio"
+                              id={`field-${field.id}-${index}`}
+                              value={option}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                              {...register(`responses.${field.id}`, {
+                                required: field.required ? `${field.label} é obrigatório` : false
+                              })}
+                            />
+                            <label htmlFor={`field-${field.id}-${index}`} className="ml-2 block text-sm text-gray-900">
+                              {option}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      {field.required && errors.responses?.[field.id] && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.responses[field.id].message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {field.type === 'NUMBER' && (
+                    <Input
+                      type="number"
+                      label={field.label + (field.required ? ' *' : '')}
+                      placeholder={field.placeholder || ''}
+                      error={field.required && errors.responses?.[field.id]?.message}
+                      {...register(`responses.${field.id}`, {
+                        required: field.required ? `${field.label} é obrigatório` : false,
+                        valueAsNumber: true
+                      })}
+                    />
+                  )}
+
+                  {field.type === 'DATE' && (
+                    <Input
+                      type="date"
+                      label={field.label + (field.required ? ' *' : '')}
+                      error={field.required && errors.responses?.[field.id]?.message}
+                      {...register(`responses.${field.id}`, {
+                        required: field.required ? `${field.label} é obrigatório` : false
+                      })}
+                    />
+                  )}
+
+                  {field.type === 'TIME' && (
+                    <Input
+                      type="time"
+                      label={field.label + (field.required ? ' *' : '')}
+                      error={field.required && errors.responses?.[field.id]?.message}
+                      {...register(`responses.${field.id}`, {
+                        required: field.required ? `${field.label} é obrigatório` : false
+                      })}
+                    />
+                  )}
+
+                  {field.type === 'EMAIL' && (
+                    <Input
+                      type="email"
+                      label={field.label + (field.required ? ' *' : '')}
+                      placeholder={field.placeholder || 'exemplo@email.com'}
+                      error={field.required && errors.responses?.[field.id]?.message}
+                      {...register(`responses.${field.id}`, {
+                        required: field.required ? `${field.label} é obrigatório` : false,
+                        pattern: {
+                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                          message: 'Email inválido'
+                        }
+                      })}
+                    />
+                  )}
+
+                  {field.type === 'PHONE' && (
+                    <Input
+                      type="tel"
+                      label={field.label + (field.required ? ' *' : '')}
+                      placeholder={field.placeholder || '(11) 99999-9999'}
+                      error={field.required && errors.responses?.[field.id]?.message}
+                      {...register(`responses.${field.id}`, {
+                        required: field.required ? `${field.label} é obrigatório` : false
+                      })}
+                    />
+                  )}
                 </div>
               ))}
             </div>

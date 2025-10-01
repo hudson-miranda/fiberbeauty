@@ -506,6 +506,7 @@ const AttendanceFormsList = () => {
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
               loading={loading}
+              isAdmin={isAdmin}
             />
           )}
 

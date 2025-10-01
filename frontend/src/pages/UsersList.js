@@ -27,7 +27,7 @@ import Button from '../components/Button';
 import ViewSwitcher from '../components/ViewSwitcher';
 import DataTable from '../components/DataTable';
 import { useViewMode } from '../hooks/useViewMode';
-import clsx from 'clsx';
+
 
 const UserCard = ({ user, onEdit, onDelete, onView, onReactivate, currentUser }) => {
   const formatDate = (dateString) => {
@@ -325,7 +325,7 @@ const ReactivateConfirmModal = ({ isOpen, onClose, user, onConfirm, loading }) =
 
 const UsersList = () => {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -638,6 +638,7 @@ const UsersList = () => {
               onReactivate={handleReactivate}
               currentUser={currentUser}
               loading={loading}
+              isAdmin={isAdmin}
             />
           )}
 

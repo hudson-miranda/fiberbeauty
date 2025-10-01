@@ -235,7 +235,7 @@ const StatCard = ({ title, value, icon: Icon, change, trend, color, description,
               
               {/* Descrição */}
               {description && (
-                <p className="text-white/70 text-[clamp(0.625rem,2vw,0.75rem)] leading-tight mb-3">
+                <p className="text-white/70 text-[clamp(0.625rem,2vw,0.75rem)] leading-tight">
                   {description}
                 </p>
               )}
@@ -1991,7 +1991,7 @@ const Dashboard = () => {
             title="Total de Clientes"
             value={stats.totalClients}
             icon={Users}
-            change={`${stats.changes.clients.value >= 0 ? '+' : ''}${stats.changes.clients.value}%`}
+            //change={`${stats.changes.clients.value >= 0 ? '+' : ''}${stats.changes.clients.value}%`}
             trend={stats.changes.clients.trend}
             color="blue"
             description="cadastrados no sistema"
@@ -2001,7 +2001,7 @@ const Dashboard = () => {
             title="Total de Atendimentos"
             value={stats.totalAttendances}
             icon={FileText}
-            change={`${stats.changes.attendances.value >= 0 ? '+' : ''}${stats.changes.attendances.value}%`}
+            //change={`${stats.changes.attendances.value >= 0 ? '+' : ''}${stats.changes.attendances.value}%`}
             trend={stats.changes.attendances.trend}
             color="indigo"
             description="fichas preenchidas"
@@ -2011,7 +2011,7 @@ const Dashboard = () => {
             title="Atendimentos Hoje"
             value={stats.todayAttendances}
             icon={Calendar}
-            change={`${stats.changes.todayAttendances.value >= 0 ? '+' : ''}${stats.changes.todayAttendances.value}%`}
+            //change={`${stats.changes.todayAttendances.value >= 0 ? '+' : ''}${stats.changes.todayAttendances.value}%`}
             trend={stats.changes.todayAttendances.trend}
             color="purple"
             description="agendados para hoje"
@@ -2021,7 +2021,7 @@ const Dashboard = () => {
             title="Taxa de Retenção"
             value={`${stats.retentionRate}%`}
             icon={Star}
-            change={`${stats.retentionRate}% retornaram`}
+            //change={`${stats.retentionRate}% retornaram`}
             trend="up"
             color="yellow"
             description="no período selecionado"

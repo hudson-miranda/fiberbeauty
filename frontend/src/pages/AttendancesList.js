@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { attendanceService, clientService, attendanceFormService, userService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Card from '../components/Card';
 import { CardSkeleton } from '../components/LoadingSpinner';
 import Pagination from '../components/Pagination';
@@ -26,7 +27,6 @@ import Button from '../components/Button';
 import ViewSwitcher from '../components/ViewSwitcher';
 import DataTable from '../components/DataTable';
 import { useViewMode } from '../hooks/useViewMode';
-import clsx from 'clsx';
 
 const AttendanceCard = ({ attendance, onEdit, onDelete, onView, onFinalize }) => {
   const formatDate = (dateString) => {
@@ -490,6 +490,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, attendance, onConfirm, loading })
 
 const AttendancesList = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [attendances, setAttendances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -815,6 +816,7 @@ const AttendancesList = () => {
               onDelete={handleDelete}
               onEndAttendance={handleFinalize}
               loading={loading}
+              isAdmin={isAdmin}
             />
           )}
 
