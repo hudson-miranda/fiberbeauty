@@ -161,7 +161,7 @@ const AttendanceNew = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="relative z-50">
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cliente *
               </label>
