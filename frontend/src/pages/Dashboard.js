@@ -1908,7 +1908,7 @@ const Dashboard = () => {
         {/* Header Premium */}
         <motion.div
           variants={fadeInUp}
-          className="relative overflow-hidden z-[150]"
+          className="relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 rounded-3xl opacity-95" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/20 rounded-3xl" />
@@ -1950,7 +1950,7 @@ const Dashboard = () => {
               
               {/* Ações */}
               <motion.div 
-                className="flex flex-wrap md:flex-nowrap items-center justify-end gap-2 sm:gap-3 relative z-[200]"
+                className="flex flex-wrap md:flex-nowrap items-center justify-end gap-2 sm:gap-3 relative"
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
